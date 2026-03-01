@@ -36,6 +36,15 @@ export default function App() {
   // Initial fetch on mount
   useEffect(() => {
     refreshAll();
+
+    // Fix extension popup size
+    if (isExtension) {
+      document.body.style.width = '800px';
+      document.body.style.height = '600px';
+      document.documentElement.style.width = '800px';
+      document.documentElement.style.height = '600px';
+      document.body.style.overflow = 'hidden';
+    }
   }, []);
 
   const fetchOpenAIData = async (forceHistory = false) => {
@@ -241,9 +250,9 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0c0c0e] text-[#e2e2e7] transition-colors duration-500 font-inter">
-      <nav className="border-b border-white/5 bg-white/2 backdrop-blur-xl sticky top-0 z-50">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+    <div className={`min-h-screen bg-[#0c0c0e] text-[#e2e2e7] transition-colors duration-500 font-inter ${isExtension ? 'w-[800px] h-[600px] overflow-hidden' : ''}`}>
+      <nav className="border-b border-white/5 bg-white/2 backdrop-blur-xl sticky top-0 z-50 overflow-hidden">
+        <div className={`${isExtension ? 'w-full' : 'max-w-6xl'} mx-auto px-6 h-16 flex items-center justify-between`}>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
               <LayoutDashboard size={18} className="text-white" />
@@ -271,7 +280,7 @@ export default function App() {
         </div>
       </nav>
 
-      <main className="max-w-6xl mx-auto px-6 py-12">
+      <main className={`${isExtension ? 'w-full px-4' : 'max-w-6xl mx-auto px-6'} ${isExtension ? 'py-4' : 'py-12'}`}>
         <AnimatePresence>
           {showSettings && (
             <motion.div
@@ -330,7 +339,7 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-stretch">
+        <div className={`grid grid-cols-1 md:grid-cols-2 ${isExtension ? 'lg:grid-cols-2 gap-4' : 'lg:grid-cols-4 gap-8'} items-stretch`}>
           {PROVIDERS.map(provider => (
             <CreditCard
               key={provider.id}
@@ -339,6 +348,7 @@ export default function App() {
               loading={loading[provider.id]}
               progressMessage={progressMessages[provider.id]}
               onRefresh={() => fetchData(provider.id)}
+              isExtension={isExtension}
             />
           ))}
         </div>
@@ -366,9 +376,11 @@ export default function App() {
         )}
       </main>
 
-      <footer className="py-12 border-t border-white/5 text-center text-sm text-gray-600">
-        <p>© 2026 Premium AI Credit Tracker • Private & Secure</p>
-      </footer>
+      {!isExtension && (
+        <footer className="py-12 border-t border-white/5 text-center text-sm text-gray-600">
+          <p>© 2026 Premium AI Credit Tracker • Private & Secure</p>
+        </footer>
+      )}
     </div>
   );
 }

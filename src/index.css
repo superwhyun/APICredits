@@ -12,8 +12,14 @@
   color: #e2e2e7;
 }
 
+html,
 body {
   margin: 0;
-  min-width: 800px;
-  min-height: 600px;
+  padding: 0;
+  background-color: #0c0c0e;
+}
+
+/* Chrome extension popup needs a defined size to avoid collapsing */
+body {
+  width: 100%;
 }
