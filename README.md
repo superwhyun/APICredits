@@ -1,16 +1,56 @@
-# React + Vite
+# AI Credit Dashboard 🚀
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+현존하는 주요 AI 서비스(OpenAI, x.ai, Moonshot AI)의 사용량과 크레딧 잔액을 한곳에서 쉽고 빠르게 모니터링할 수 있는 프리미엄 대시보드입니다.
 
-Currently, two official plugins are available:
+## 주요 기능 (Key Features)
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+### 1. OpenAI 지능형 모니터링
+- **실시간 데이터**: 이번 달 1일부터 현재까지의 사용량을 실시간으로 조회합니다.
+- **자동 월별 캐싱**: 과거 5개월치의 월별 사용량을 자동으로 가져와 로컬 브라우저에 저장합니다. 이후 접속 시에는 추가 API 호출 없이 즉시 표시되어 매우 빠릅니다.
+- **진행 상황 안내**: 초기 데이터 로딩 시 "??월 요금 가져오는 중..."과 같은 메시지를 통해 투명하게 진행 상황을 알려줍니다.
 
-## React Compiler
+### 2. x.ai (Grok) 밸런스 체크
+- **Prepaid/Postpaid 지원**: 선불형 잔액과 후불형 사용량을 모두 지원합니다.
+- **사용량 게이지**: 설정된 한도 대비 현재 사용량을 시각적인 게이지로 보여줍니다.
 
-The React Compiler is currently not compatible with SWC. See [this issue](https://github.com/vitejs/vite-plugin-react/issues/428) for tracking the progress.
+### 3. Moonshot AI 상세 잔액
+- **하이브리드 잔액 표시**: 현금 잔액(Cash)과 바우처(Voucher) 잔액을 구분하여 상세히 표시합니다.
+- **만료 안내**: 바우처의 경우 만료 기한이 있을 수 있음을 알려주는 안내 메시지를 한국어로 제공합니다.
 
-## Expanding the ESLint configuration
+### 4. 보안 및 성능 (Privacy & Performance)
+- **로컬 저장**: 모든 API Key와 월별 캐시 데이터는 사용자의 브라우저(`localStorage`)에만 저장됩니다. 서버에는 절대 전송되지 않습니다.
+- **Vercel Proxy**: API Key 노출을 방지하기 위해 Vercel Serverless Functions를 프록시로 사용하여 안전하게 데이터를 요청합니다.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## 로컬 테스트 (Local Testing)
+
+개발 및 테스트 환경에 따라 다음 명령어를 사용하세요:
+
+### 1. 프론트엔드 UI 개발
+```bash
+npm run dev
+```
+- Vite 기반의 빠른 핫 리로딩을 지원합니다. (기본 UI 작업 시 권장)
+
+### 2. 전체 기능 테스트 (Backend Proxy 포함)
+```bash
+npx vercel dev
+```
+- `/api/*.js`에 정의된 서버리스 함수를 포함하여 실제 배포 환경과 동일하게 테스트할 수 있습니다. (API 연동 확인 시 권장)
+
+## 배포 가이드 (Deployment)
+
+이 프로젝트는 **Vercel**에 최적화되어 있습니다.
+
+### 방법 1: CLI 배포
+```bash
+npx vercel
+```
+- 터미널에서 즉시 배포하고 URL을 생성합니다.
+
+### 방법 2: GitHub 연동 (권장)
+1. [Vercel Dashboard](https://vercel.com/dashboard)에 접속합니다.
+2. `New Project`를 클릭하고 현재 리포지토리(`superwhyun/APICredits`)를 연결합니다.
+3. `Deploy`를 클릭하면 이후 `git push`를 할 때마다 자동으로 배포됩니다.
+
+---
+© 2026 Admin Dashboard Project.
