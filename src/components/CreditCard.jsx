@@ -10,6 +10,7 @@ const ICON_MAP = {
 
 export default function CreditCard({ provider, data, loading, progressMessage, onRefresh }) {
     const Icon = ICON_MAP[provider.icon] || Zap;
+    const [isExpanded, setIsExpanded] = React.useState(false);
 
     const renderContent = () => {
         if (loading) {
@@ -49,7 +50,6 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
 
         // Provider Specific Rendering
         if (provider.id === 'openai') {
-            const [isExpanded, setIsExpanded] = React.useState(false);
             const currentMonth = data.current_month_total || 0;
             const historyMap = data.history || {};
 
@@ -66,7 +66,7 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                     <div className="flex justify-between items-end">
                         <div className="flex-1">
                             <p className="text-xs text-blue-400 uppercase tracking-widest mb-1 font-bold italic">Total Aggregated Usage</p>
-                            <h3 className="text-4xl font-bold">${totalAggregated.toFixed(2)}</h3>
+                            <h3 className="text-4xl font-bold">${Number(totalAggregated).toFixed(2)}</h3>
                         </div>
                     </div>
 
@@ -74,11 +74,11 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                         <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
                             <div className="flex justify-between items-center text-xs">
                                 <span className="text-gray-500">이번 달 실시간 (API)</span>
-                                <span className="text-blue-400 font-mono font-bold">${currentMonth.toFixed(2)}</span>
+                                <span className="text-blue-400 font-mono font-bold">${Number(currentMonth).toFixed(2)}</span>
                             </div>
                             <div className="flex justify-between items-center text-xs border-t border-white/5 pt-3">
                                 <span className="text-gray-500">과거 누적 (Cached)</span>
-                                <span className="text-gray-300 font-mono font-semibold">${totalHistory.toFixed(2)}</span>
+                                <span className="text-gray-300 font-mono font-semibold">${Number(totalHistory).toFixed(2)}</span>
                             </div>
                         </div>
 
@@ -109,7 +109,7 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                                                 {historyArray.map((item, idx) => (
                                                     <div key={idx} className="flex justify-between items-center text-[10px]">
                                                         <span className="text-gray-600">{item.month}</span>
-                                                        <span className="text-gray-400 font-mono">${item.total.toFixed(2)}</span>
+                                                        <span className="text-gray-400 font-mono">${Number(item.total).toFixed(2)}</span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -143,7 +143,7 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                             <p className="text-xs text-gray-500 uppercase tracking-widest mb-1 font-bold">
                                 {isPostpaid ? 'Current Spend (Postpaid)' : 'Available Balance (Prepaid)'}
                             </p>
-                            <h3 className="text-4xl font-bold">${amount.toFixed(2)}</h3>
+                            <h3 className="text-4xl font-bold">${Number(amount).toFixed(2)}</h3>
                         </div>
                     </div>
 
@@ -165,7 +165,7 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                             <div className="space-y-2 px-1">
                                 <div className="flex justify-between text-[10px] text-gray-500 uppercase font-bold tracking-wider">
                                     <span>Usage Progress</span>
-                                    <span>Limit: ${limit.toFixed(2)}</span>
+                                    <span>Limit: ${Number(limit).toFixed(2)}</span>
                                 </div>
                                 <div className="h-2.5 bg-white/5 rounded-full overflow-hidden p-[1px] border border-white/5">
                                     <motion.div
@@ -199,17 +199,17 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                 <div className="space-y-6">
                     <div>
                         <p className="text-xs text-gray-400 uppercase tracking-widest mb-1 font-bold">Available Balance</p>
-                        <h3 className="text-4xl font-bold">${available.toFixed(2)}</h3>
+                        <h3 className="text-4xl font-bold">${Number(available).toFixed(2)}</h3>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-3">
                         <div className="flex justify-between items-center text-xs">
                             <span className="text-gray-500 font-medium text-[10px] uppercase">Cash</span>
-                            <span className="text-gray-300 font-mono font-semibold">${cash.toFixed(2)}</span>
+                            <span className="text-gray-300 font-mono font-semibold">${Number(cash).toFixed(2)}</span>
                         </div>
                         <div className="flex justify-between items-center text-xs border-t border-white/5 pt-3">
                             <span className="text-gray-500 font-medium text-[10px] uppercase">Voucher</span>
-                            <span className="text-gray-300 font-mono font-semibold">${voucher.toFixed(2)}</span>
+                            <span className="text-gray-300 font-mono font-semibold">${Number(voucher).toFixed(2)}</span>
                         </div>
                     </div>
 
@@ -227,7 +227,7 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                 <div className="space-y-6">
                     <div>
                         <p className="text-xs text-gray-400 uppercase tracking-widest mb-1 font-bold">Cloud Credit Balance</p>
-                        <h3 className="text-4xl font-bold">${amount.toFixed(2)}</h3>
+                        <h3 className="text-4xl font-bold">${Number(amount).toFixed(2)}</h3>
                     </div>
 
                     <div className="p-4 rounded-2xl bg-white/5 border border-white/5 space-y-4">

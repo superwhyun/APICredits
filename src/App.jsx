@@ -11,6 +11,8 @@ const PROVIDERS = [
   { id: 'runpod', name: 'RunPod', icon: 'zap' }
 ];
 
+const isExtension = typeof chrome !== 'undefined' && chrome.runtime?.id;
+
 export default function App() {
   const [keys, setKeys] = useState(() => {
     const saved = localStorage.getItem('api_keys');
@@ -22,9 +24,9 @@ export default function App() {
     return saved ? JSON.parse(saved) : {};
   });
 
-  const [data, setData] = useState({ openai: null, xai: null, moonshot: null });
-  const [loading, setLoading] = useState({ openai: false, xai: false, moonshot: false });
-  const [progressMessages, setProgressMessages] = useState({ openai: '', xai: '', moonshot: '' });
+  const [data, setData] = useState({ openai: null, xai: null, moonshot: null, runpod: null });
+  const [loading, setLoading] = useState({ openai: false, xai: false, moonshot: false, runpod: false });
+  const [progressMessages, setProgressMessages] = useState({ openai: '', xai: '', moonshot: '', runpod: '' });
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
@@ -57,11 +59,29 @@ export default function App() {
           const startTs = Math.floor(d.getTime() / 1000);
           const endTs = Math.floor(new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime() / 1000);
 
-          const response = await axios.post(`/api/openai`, {
-            apiKey: keys[providerId],
-            startTime: startTs,
-            endTime: endTs
-          });
+          let response;
+          if (isExtension) {
+            let url = `https://api.openai.com/v1/organization/costs?start_time=${startTs}&limit=180&end_time=${endTs}`;
+            response = await axios.get(url, {
+              headers: { 'Authorization': `Bearer ${keys[providerId]}` }
+            });
+            // Map common format
+            let total = 0;
+            if (response.data?.data) {
+              response.data.data.forEach(bucket => {
+                bucket.results?.forEach(r => {
+                  if (r.amount?.value) total += parseFloat(r.amount.value);
+                });
+              });
+            }
+            response.data = { total };
+          } else {
+            response = await axios.post(`/api/openai`, {
+              apiKey: keys[providerId],
+              startTime: startTs,
+              endTime: endTs
+            });
+          }
 
           currentCache[monthKey] = response.data.total;
           localStorage.setItem('openai_monthly_cache', JSON.stringify(currentCache));
@@ -71,7 +91,27 @@ export default function App() {
 
       // 2. Fetch current month always
       setProgressMessages(prev => ({ ...prev, [providerId]: `이번 달 요금 가져오는 중...` }));
-      const response = await axios.post(`/api/openai`, { apiKey: keys[providerId] });
+
+      let response;
+      if (isExtension) {
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const startTs = Math.floor(startOfMonth.getTime() / 1000);
+        let url = `https://api.openai.com/v1/organization/costs?start_time=${startTs}&limit=180`;
+        response = await axios.get(url, {
+          headers: { 'Authorization': `Bearer ${keys[providerId]}` }
+        });
+        let total = 0;
+        if (response.data?.data) {
+          response.data.data.forEach(bucket => {
+            bucket.results?.forEach(r => {
+              if (r.amount?.value) total += parseFloat(r.amount.value);
+            });
+          });
+        }
+        response.data = { total };
+      } else {
+        response = await axios.post(`/api/openai`, { apiKey: keys[providerId] });
+      }
 
       setData(prev => ({
         ...prev,
@@ -98,7 +138,95 @@ export default function App() {
 
     setLoading(prev => ({ ...prev, [providerId]: true }));
     try {
-      const response = await axios.post(`/api/${providerId}`, { apiKey: keys[providerId] });
+      let response;
+      if (isExtension) {
+        const apiKey = keys[providerId];
+        const headers = { 'Authorization': `Bearer ${apiKey}` };
+
+        if (providerId === 'xai') {
+          const baseMgmtUrl = 'https://management-api.x.ai';
+          let teams = [];
+          try {
+            const validRes = await axios.get(`${baseMgmtUrl}/auth/management-keys/validation`, { headers });
+            if (validRes.data.team) teams.push(validRes.data.team);
+            if (validRes.data.teams) teams = [...teams, ...validRes.data.teams];
+            if (validRes.data.teamId) teams.push({ id: validRes.data.teamId, name: validRes.data.teamName || 'Professional Team' });
+          } catch (e) { }
+
+          if (teams.length === 0) {
+            try {
+              const teamsRes = await axios.get(`${baseMgmtUrl}/v1/teams`, { headers });
+              const foundTeams = teamsRes.data.teams || (Array.isArray(teamsRes.data) ? teamsRes.data : [teamsRes.data]);
+              if (foundTeams) teams = Array.isArray(foundTeams) ? foundTeams : [foundTeams];
+            } catch (e) { }
+          }
+
+          const uniqueTeams = Array.from(new Map(teams.filter(t => t && t.id).map(t => [t.id, t])).values());
+          let bestResult = null;
+          for (const team of uniqueTeams) {
+            const endpoints = [
+              `/v1/billing/teams/${team.id}/prepaid/balance`,
+              `/v1/billing/teams/${team.id}/balance`,
+              `/v1/billing/teams/${team.id}/usage`
+            ];
+            for (const endpoint of endpoints) {
+              try {
+                const bRes = await axios.get(`${baseMgmtUrl}${endpoint}`, { headers });
+                const rawData = bRes.data;
+                let b = 0;
+                if (rawData.total !== undefined) {
+                  const t = rawData.total;
+                  const val = typeof t === 'object' ? (t.amount || t.val || 0) : t;
+                  b = parseFloat(val);
+                } else {
+                  b = rawData.balance || rawData.available_balance || rawData.amount || 0;
+                }
+
+                if (b !== 0) {
+                  const absB = Math.abs(b);
+                  const displayBalance = absB > 100000 ? absB / 1000000 : (absB > 1000 ? absB / 100 : absB);
+                  const result = { balance: displayBalance, team: team };
+                  if (endpoint.includes('prepaid/balance')) {
+                    bestResult = result;
+                    break;
+                  }
+                  if (!bestResult || displayBalance > bestResult.balance) bestResult = result;
+                }
+              } catch (e) { }
+            }
+            if (bestResult?.balance !== 0 && bestResult !== null) break;
+
+            // Check postpaid
+            try {
+              const spendingRes = await axios.get(`${baseMgmtUrl}/v1/billing/teams/${team.id}/postpaid/spending-limits`, { headers });
+              if (spendingRes.data.spending_limits?.monthly_limit > 0) {
+                const spend = Number(spendingRes.data.spending_limits?.current_spend || 0);
+                const limit = Number(spendingRes.data.spending_limits?.monthly_limit);
+                bestResult = { balance: spend, team: team, isPostpaid: true, limit: limit };
+                break;
+              }
+            } catch (e) { }
+          }
+          response = { data: bestResult || { balance: 0, team: uniqueTeams[0] } };
+        } else if (providerId === 'moonshot') {
+          // Try both domains as in proxy
+          try {
+            response = await axios.get('https://api.moonshot.cn/v1/users/me/balance', { headers });
+          } catch (e) {
+            response = await axios.get('https://api.moonshot.ai/v1/users/me/balance', { headers });
+          }
+        } else if (providerId === 'runpod') {
+          const gqlResponse = await axios.post(
+            `https://api.runpod.io/graphql?api_key=${apiKey}`,
+            { query: `query { myself { clientBalance } }` },
+            { headers: { 'Content-Type': 'application/json' } }
+          );
+          if (gqlResponse.data.errors) throw new Error(gqlResponse.data.errors[0].message);
+          response = { data: { balance: Number(gqlResponse.data.data?.myself?.clientBalance || 0) } };
+        }
+      } else {
+        response = await axios.post(`/api/${providerId}`, { apiKey: keys[providerId] });
+      }
       setData(prev => ({ ...prev, [providerId]: response.data }));
     } catch (error) {
       console.error(`Error fetching ${providerId}:`, error);
