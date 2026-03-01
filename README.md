@@ -17,6 +17,10 @@
 - **하이브리드 잔액 표시**: 현금 잔액(Cash)과 바우처(Voucher) 잔액을 구분하여 상세히 표시합니다.
 - **만료 안내**: 바우처의 경우 만료 기한이 있을 수 있음을 알려주는 안내 메시지를 한국어로 제공합니다.
 
+### 4. RunPod GPU 클라우드 잔액
+- **실시간 잔액 조회**: GraphQL API를 통해 현재 계정의 `clientBalance`를 실시간으로 가져옵니다.
+- **통합 모니터링**: GPU 및 서버리스 환경에 최적화된 잔액 정보를 대시보드에서 한눈에 확인할 수 있습니다.
+
 ### 4. 보안 및 성능 (Privacy & Performance)
 - **로컬 저장**: 모든 API Key와 월별 캐시 데이터는 사용자의 브라우저(`localStorage`)에만 저장됩니다. 서버에는 절대 전송되지 않습니다.
 - **Vercel Proxy**: API Key 노출을 방지하기 위해 Vercel Serverless Functions를 프록시로 사용하여 안전하게 데이터를 요청합니다.
@@ -36,6 +40,10 @@
 
 ### 3. Moonshot AI
 - **키 발급처**: [Moonshot AI Platform](https://platform.moonshot.cn/console/api-keys)
+
+### 4. RunPod (API Key with GraphQL Permissions)
+- **키 발급처**: [RunPod Console - Settings](https://www.runpod.io/console/settings)
+- **필요 권한**: 반드시 **GraphQL** (Read 또는 Full Access) 권한이 포함된 API Key여야 잔액 조회가 가능합니다.
 
 ---
 

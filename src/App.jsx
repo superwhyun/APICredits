@@ -7,13 +7,14 @@ import axios from 'axios';
 const PROVIDERS = [
   { id: 'openai', name: 'OpenAI', icon: 'zap' },
   { id: 'xai', name: 'x.ai (Grok)', icon: 'cpu' },
-  { id: 'moonshot', name: 'Moonshot AI', icon: 'moon' }
+  { id: 'moonshot', name: 'Moonshot AI', icon: 'moon' },
+  { id: 'runpod', name: 'RunPod', icon: 'zap' }
 ];
 
 export default function App() {
   const [keys, setKeys] = useState(() => {
     const saved = localStorage.getItem('api_keys');
-    return saved ? JSON.parse(saved) : { openai: '', xai: '', moonshot: '' };
+    return saved ? JSON.parse(saved) : { openai: '', xai: '', moonshot: '', runpod: '' };
   });
 
   const [openaiCache, setOpenaiCache] = useState(() => {
@@ -156,7 +157,7 @@ export default function App() {
                   <Key size={20} className="text-blue-500" />
                   <h2 className="text-lg font-semibold">API Settings</h2>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                   {PROVIDERS.map(p => (
                     <div key={p.id} className="space-y-2">
                       <label className="text-sm font-medium text-gray-400 px-1">{p.name} Key</label>
@@ -201,7 +202,7 @@ export default function App() {
           )}
         </AnimatePresence>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 items-stretch">
           {PROVIDERS.map(provider => (
             <CreditCard
               key={provider.id}
