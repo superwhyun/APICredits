@@ -21,6 +21,24 @@
 - **로컬 저장**: 모든 API Key와 월별 캐시 데이터는 사용자의 브라우저(`localStorage`)에만 저장됩니다. 서버에는 절대 전송되지 않습니다.
 - **Vercel Proxy**: API Key 노출을 방지하기 위해 Vercel Serverless Functions를 프록시로 사용하여 안전하게 데이터를 요청합니다.
 
+## API 설정 가이드 (API Key Requirements)
+
+각 서비스의 정확한 사용량을 조회하기 위해서는 상위 권한이 있는 API Key가 필요할 수 있습니다.
+
+### 1. OpenAI (Management/Organization Key)
+- **필요 권한**: 전체 조직의 비용을 조회하려면 **Organization** 레벨의 권한이 있는 키가 필요합니다.
+- **키 발급처**: [OpenAI API Keys](https://platform.openai.com/api-keys)
+- **참고**: 프로젝트 전용 키가 아닌, 비용 관리 권한이 포함된 키를 사용해 주세요.
+
+### 2. x.ai (Management Key)
+- **키 발급처**: [x.ai Console](https://console.x.ai/)
+- **참고**: 단순히 채팅용이 아닌, 계정 관리 및 잔액 조회가 가능한 관리자용 키를 권장합니다.
+
+### 3. Moonshot AI
+- **키 발급처**: [Moonshot AI Platform](https://platform.moonshot.cn/console/api-keys)
+
+---
+
 ## 로컬 테스트 (Local Testing)
 
 개발 및 테스트 환경에 따라 다음 명령어를 사용하세요:
