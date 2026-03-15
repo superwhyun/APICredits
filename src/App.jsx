@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Settings, RefreshCw, Key, ShieldCheck, Moon, Sun, LayoutDashboard, Database, Info } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { Settings, RefreshCw, Key, ShieldCheck, LayoutDashboard, Info } from 'lucide-react';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import CreditCard from './components/CreditCard';
 import axios from 'axios';
 
@@ -8,15 +8,39 @@ const PROVIDERS = [
   { id: 'openai', name: 'OpenAI', icon: 'zap' },
   { id: 'xai', name: 'x.ai (Grok)', icon: 'cpu' },
   { id: 'moonshot', name: 'Moonshot AI', icon: 'moon' },
-  { id: 'runpod', name: 'RunPod', icon: 'zap' }
+  { id: 'runpod', name: 'RunPod', icon: 'zap' },
+  { id: 'tavily', name: 'Tavily', icon: 'database' }
 ];
 
-const isExtension = typeof chrome !== 'undefined' && chrome.runtime?.id;
+const isExtension = typeof globalThis.chrome !== 'undefined' && globalThis.chrome.runtime?.id;
+const isLocalDev = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+
+const fetchTavilyUsage = async (apiKey) => {
+  const response = await fetch('https://api.tavily.com/usage', {
+    method: 'GET',
+    cache: 'no-store',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Cache-Control': 'no-cache',
+      'Pragma': 'no-cache'
+    }
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const error = new Error(data?.detail || data?.message || `Request failed with status ${response.status}`);
+    error.response = { data, status: response.status };
+    throw error;
+  }
+
+  return { data };
+};
 
 export default function App() {
   const [keys, setKeys] = useState(() => {
     const saved = localStorage.getItem('api_keys');
-    return saved ? JSON.parse(saved) : { openai: '', xai: '', moonshot: '', runpod: '' };
+    return saved ? JSON.parse(saved) : { openai: '', xai: '', moonshot: '', runpod: '', tavily: '' };
   });
 
   const [openaiCache, setOpenaiCache] = useState(() => {
@@ -24,9 +48,9 @@ export default function App() {
     return saved ? JSON.parse(saved) : {};
   });
 
-  const [data, setData] = useState({ openai: null, xai: null, moonshot: null, runpod: null });
-  const [loading, setLoading] = useState({ openai: false, xai: false, moonshot: false, runpod: false });
-  const [progressMessages, setProgressMessages] = useState({ openai: '', xai: '', moonshot: '', runpod: '' });
+  const [data, setData] = useState({ openai: null, xai: null, moonshot: null, runpod: null, tavily: null });
+  const [loading, setLoading] = useState({ openai: false, xai: false, moonshot: false, runpod: false, tavily: false });
+  const [progressMessages, setProgressMessages] = useState({ openai: '', xai: '', moonshot: '', runpod: '', tavily: '' });
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
@@ -43,8 +67,12 @@ export default function App() {
       document.body.style.height = '600px';
       document.documentElement.style.width = '800px';
       document.documentElement.style.height = '600px';
-      document.body.style.overflow = 'hidden';
+      document.body.style.overflowY = 'auto';
+      document.body.style.overflowX = 'hidden';
+      document.documentElement.style.overflowY = 'auto';
+      document.documentElement.style.overflowX = 'hidden';
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchOpenAIData = async (forceHistory = false) => {
@@ -148,8 +176,10 @@ export default function App() {
     setLoading(prev => ({ ...prev, [providerId]: true }));
     try {
       let response;
-      if (isExtension) {
-        const apiKey = keys[providerId];
+      const apiKey = keys[providerId];
+      if (providerId === 'tavily' && (isExtension || isLocalDev)) {
+        response = await fetchTavilyUsage(apiKey);
+      } else if (isExtension) {
         const headers = { 'Authorization': `Bearer ${apiKey}` };
 
         if (providerId === 'xai') {
@@ -160,14 +190,18 @@ export default function App() {
             if (validRes.data.team) teams.push(validRes.data.team);
             if (validRes.data.teams) teams = [...teams, ...validRes.data.teams];
             if (validRes.data.teamId) teams.push({ id: validRes.data.teamId, name: validRes.data.teamName || 'Professional Team' });
-          } catch (e) { }
+          } catch {
+            // Ignore validation lookup failures and try fallback endpoints.
+          }
 
           if (teams.length === 0) {
             try {
               const teamsRes = await axios.get(`${baseMgmtUrl}/v1/teams`, { headers });
               const foundTeams = teamsRes.data.teams || (Array.isArray(teamsRes.data) ? teamsRes.data : [teamsRes.data]);
               if (foundTeams) teams = Array.isArray(foundTeams) ? foundTeams : [foundTeams];
-            } catch (e) { }
+            } catch {
+              // Ignore team discovery failures and continue with other endpoints.
+            }
           }
 
           const uniqueTeams = Array.from(new Map(teams.filter(t => t && t.id).map(t => [t.id, t])).values());
@@ -201,7 +235,9 @@ export default function App() {
                   }
                   if (!bestResult || displayBalance > bestResult.balance) bestResult = result;
                 }
-              } catch (e) { }
+              } catch {
+                // Ignore per-endpoint failures while probing x.ai billing APIs.
+              }
             }
             if (bestResult?.balance !== 0 && bestResult !== null) break;
 
@@ -214,14 +250,16 @@ export default function App() {
                 bestResult = { balance: spend, team: team, isPostpaid: true, limit: limit };
                 break;
               }
-            } catch (e) { }
+            } catch {
+              // Ignore postpaid lookup failures and keep the best discovered result.
+            }
           }
           response = { data: bestResult || { balance: 0, team: uniqueTeams[0] } };
         } else if (providerId === 'moonshot') {
           // Try both domains as in proxy
           try {
             response = await axios.get('https://api.moonshot.cn/v1/users/me/balance', { headers });
-          } catch (e) {
+          } catch {
             response = await axios.get('https://api.moonshot.ai/v1/users/me/balance', { headers });
           }
         } else if (providerId === 'runpod') {
@@ -234,8 +272,9 @@ export default function App() {
           response = { data: { balance: Number(gqlResponse.data.data?.myself?.clientBalance || 0) } };
         }
       } else {
-        response = await axios.post(`/api/${providerId}`, { apiKey: keys[providerId] });
+        response = await axios.post(`/api/${providerId}`, { apiKey });
       }
+
       setData(prev => ({ ...prev, [providerId]: response.data }));
     } catch (error) {
       console.error(`Error fetching ${providerId}:`, error);
@@ -250,7 +289,7 @@ export default function App() {
   };
 
   return (
-    <div className={`min-h-screen bg-[#0c0c0e] text-[#e2e2e7] transition-colors duration-500 font-inter ${isExtension ? 'w-[800px] h-[600px] overflow-hidden' : ''}`}>
+    <div className={`min-h-screen bg-[#0c0c0e] text-[#e2e2e7] transition-colors duration-500 font-inter ${isExtension ? 'w-[800px] h-[600px] overflow-y-auto overflow-x-hidden' : ''}`}>
       <nav className="border-b border-white/5 bg-white/2 backdrop-blur-xl sticky top-0 z-50 overflow-hidden">
         <div className={`${isExtension ? 'w-full' : 'max-w-6xl'} mx-auto px-6 h-16 flex items-center justify-between`}>
           <div className="flex items-center gap-2">
@@ -283,7 +322,7 @@ export default function App() {
       <main className={`${isExtension ? 'w-full px-4' : 'max-w-6xl mx-auto px-6'} ${isExtension ? 'py-4' : 'py-12'}`}>
         <AnimatePresence>
           {showSettings && (
-            <motion.div
+            <Motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
@@ -335,7 +374,7 @@ export default function App() {
                   </button>
                 </div>
               </div>
-            </motion.div>
+            </Motion.div>
           )}
         </AnimatePresence>
 
@@ -353,8 +392,8 @@ export default function App() {
           ))}
         </div>
 
-        {!keys.openai && !keys.xai && !keys.moonshot && !showSettings && (
-          <motion.div
+        {!keys.openai && !keys.xai && !keys.moonshot && !keys.runpod && !keys.tavily && !showSettings && (
+          <Motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="mt-24 text-center space-y-4"
@@ -372,7 +411,7 @@ export default function App() {
             >
               Setup API Keys
             </button>
-          </motion.div>
+          </Motion.div>
         )}
       </main>
 

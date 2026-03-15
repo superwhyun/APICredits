@@ -1,6 +1,6 @@
 # AI Credit Dashboard 🚀
 
-현존하는 주요 AI 서비스(OpenAI, x.ai, Moonshot AI)의 사용량과 크레딧 잔액을 한곳에서 쉽고 빠르게 모니터링할 수 있는 프리미엄 대시보드입니다.
+현존하는 주요 AI 서비스(OpenAI, x.ai, Moonshot AI, RunPod, Tavily)의 사용량과 크레딧 잔액을 한곳에서 쉽고 빠르게 모니터링할 수 있는 프리미엄 대시보드입니다.
 
 ## 주요 기능 (Key Features)
 
@@ -21,7 +21,11 @@
 - **실시간 잔액 조회**: GraphQL API를 통해 현재 계정의 `clientBalance`를 실시간으로 가져옵니다.
 - **통합 모니터링**: GPU 및 서버리스 환경에 최적화된 잔액 정보를 대시보드에서 한눈에 확인할 수 있습니다.
 
-### 4. 보안 및 성능 (Privacy & Performance)
+### 5. Tavily 크레딧 조회
+- **실시간 크레딧 확인**: Tavily Usage API를 통해 남은 크레딧과 사용량을 즉시 확인합니다.
+- **플랜/리셋일 표시**: 현재 플랜과 크레딧 리셋 일자를 함께 보여줍니다.
+
+### 6. 보안 및 성능 (Privacy & Performance)
 - **로컬 저장**: 모든 API Key와 월별 캐시 데이터는 사용자의 브라우저(`localStorage`)에만 저장됩니다. 서버에는 절대 전송되지 않습니다.
 - **Vercel Proxy**: API Key 노출을 방지하기 위해 Vercel Serverless Functions를 프록시로 사용하여 안전하게 데이터를 요청합니다.
 
@@ -44,6 +48,10 @@
 ### 4. RunPod (API Key with GraphQL Permissions)
 - **키 발급처**: [RunPod Console - Settings](https://www.runpod.io/console/settings)
 - **필요 권한**: 반드시 **GraphQL** (Read 또는 Full Access) 권한이 포함된 API Key여야 잔액 조회가 가능합니다.
+
+### 5. Tavily
+- **키 발급처**: [Tavily Dashboard](https://app.tavily.com/home)
+- **필요 권한**: Usage 조회가 가능한 일반 Tavily API Key를 사용하면 됩니다.
 
 ---
 

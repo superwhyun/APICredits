@@ -26,14 +26,18 @@ export default async function handler(req, res) {
             if (validRes.data.team) teams.push(validRes.data.team);
             if (validRes.data.teams) teams = [...teams, ...validRes.data.teams];
             if (validRes.data.teamId) teams.push({ id: validRes.data.teamId, name: validRes.data.teamName || 'Professional Team' });
-        } catch (e) { }
+        } catch {
+            // Ignore validation lookup failures and try alternative team discovery.
+        }
 
         if (teams.length === 0) {
             try {
                 const teamsRes = await axios.get(`${BASE_URL}/v1/teams`, { headers });
                 const foundTeams = teamsRes.data.teams || (Array.isArray(teamsRes.data) ? teamsRes.data : [teamsRes.data]);
                 if (foundTeams) teams = Array.isArray(foundTeams) ? foundTeams : [foundTeams];
-            } catch (e) { }
+            } catch {
+                // Ignore team listing failures and continue with any discovered teams.
+            }
         }
 
         // Deduplicate
@@ -102,7 +106,9 @@ export default async function handler(req, res) {
                         debug: logs
                     });
                 }
-            } catch (e) { }
+            } catch {
+                // Ignore postpaid lookup failures and fall back to discovered balance data.
+            }
         }
 
         res.status(200).json({
