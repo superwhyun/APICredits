@@ -9,11 +9,15 @@ const PROVIDERS = [
   { id: 'xai', name: 'x.ai (Grok)', icon: 'cpu' },
   { id: 'moonshot', name: 'Moonshot AI', icon: 'moon' },
   { id: 'runpod', name: 'RunPod', icon: 'zap' },
-  { id: 'tavily', name: 'Tavily', icon: 'database' }
+  { id: 'tavily', name: 'Tavily', icon: 'database' },
+  { id: 'openrouter', name: 'OpenRouter', icon: 'zap' }
 ];
 
 const isExtension = typeof globalThis.chrome !== 'undefined' && globalThis.chrome.runtime?.id;
-const isLocalDev = typeof window !== 'undefined' && ['localhost', '127.0.0.1'].includes(window.location.hostname);
+const isLocalDev = typeof window !== 'undefined' && 
+  (window.location.hostname.includes('localhost') || 
+   window.location.hostname === '127.0.0.1' || 
+   window.location.hostname.startsWith('192.168.'));
 
 const fetchTavilyUsage = async (apiKey) => {
   const response = await fetch('https://api.tavily.com/usage', {
@@ -40,7 +44,7 @@ const fetchTavilyUsage = async (apiKey) => {
 export default function App() {
   const [keys, setKeys] = useState(() => {
     const saved = localStorage.getItem('api_keys');
-    return saved ? JSON.parse(saved) : { openai: '', xai: '', moonshot: '', runpod: '', tavily: '' };
+    return saved ? JSON.parse(saved) : { openai: '', xai: '', moonshot: '', runpod: '', tavily: '', openrouter: '' };
   });
 
   const [openaiCache, setOpenaiCache] = useState(() => {
@@ -48,9 +52,9 @@ export default function App() {
     return saved ? JSON.parse(saved) : {};
   });
 
-  const [data, setData] = useState({ openai: null, xai: null, moonshot: null, runpod: null, tavily: null });
-  const [loading, setLoading] = useState({ openai: false, xai: false, moonshot: false, runpod: false, tavily: false });
-  const [progressMessages, setProgressMessages] = useState({ openai: '', xai: '', moonshot: '', runpod: '', tavily: '' });
+  const [data, setData] = useState({ openai: null, xai: null, moonshot: null, runpod: null, tavily: null, openrouter: null });
+  const [loading, setLoading] = useState({ openai: false, xai: false, moonshot: false, runpod: false, tavily: false, openrouter: false });
+  const [progressMessages, setProgressMessages] = useState({ openai: '', xai: '', moonshot: '', runpod: '', tavily: '', openrouter: '' });
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
@@ -60,6 +64,8 @@ export default function App() {
   // Initial fetch on mount
   useEffect(() => {
     refreshAll();
+    
+    console.log('App Mode:', { isExtension, isLocalDev, host: window.location.hostname });
 
     // Fix extension popup size
     if (isExtension) {
@@ -97,7 +103,7 @@ export default function App() {
           const endTs = Math.floor(new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime() / 1000);
 
           let response;
-          if (isExtension) {
+          if (isExtension || isLocalDev) {
             let url = `https://api.openai.com/v1/organization/costs?start_time=${startTs}&limit=180&end_time=${endTs}`;
             response = await axios.get(url, {
               headers: { 'Authorization': `Bearer ${keys[providerId]}` }
@@ -130,7 +136,7 @@ export default function App() {
       setProgressMessages(prev => ({ ...prev, [providerId]: `이번 달 요금 가져오는 중...` }));
 
       let response;
-      if (isExtension) {
+      if (isExtension || isLocalDev) {
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
         const startTs = Math.floor(startOfMonth.getTime() / 1000);
         let url = `https://api.openai.com/v1/organization/costs?start_time=${startTs}&limit=180`;
@@ -179,7 +185,7 @@ export default function App() {
       const apiKey = keys[providerId];
       if (providerId === 'tavily' && (isExtension || isLocalDev)) {
         response = await fetchTavilyUsage(apiKey);
-      } else if (isExtension) {
+      } else if (isExtension || isLocalDev) {
         const headers = { 'Authorization': `Bearer ${apiKey}` };
 
         if (providerId === 'xai') {
@@ -270,6 +276,8 @@ export default function App() {
           );
           if (gqlResponse.data.errors) throw new Error(gqlResponse.data.errors[0].message);
           response = { data: { balance: Number(gqlResponse.data.data?.myself?.clientBalance || 0) } };
+        } else if (providerId === 'openrouter') {
+          response = await axios.get('https://openrouter.ai/api/v1/credits', { headers });
         }
       } else {
         response = await axios.post(`/api/${providerId}`, { apiKey });
@@ -392,7 +400,7 @@ export default function App() {
           ))}
         </div>
 
-        {!keys.openai && !keys.xai && !keys.moonshot && !keys.runpod && !keys.tavily && !showSettings && (
+        {!keys.openai && !keys.xai && !keys.moonshot && !keys.runpod && !keys.tavily && !keys.openrouter && !showSettings && (
           <Motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

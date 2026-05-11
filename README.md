@@ -1,6 +1,6 @@
 # AI Credit Dashboard 🚀
 
-현존하는 주요 AI 서비스(OpenAI, x.ai, Moonshot AI, RunPod, Tavily)의 사용량과 크레딧 잔액을 한곳에서 쉽고 빠르게 모니터링할 수 있는 프리미엄 대시보드입니다.
+현존하는 주요 AI 서비스(OpenAI, x.ai, OpenRouter, Moonshot AI, RunPod, Tavily)의 사용량과 크레딧 잔액을 한곳에서 쉽고 빠르게 모니터링할 수 있는 프리미엄 대시보드입니다.
 
 ## 주요 기능 (Key Features)
 
@@ -12,6 +12,11 @@
 ### 2. x.ai (Grok) 밸런스 체크
 - **Prepaid/Postpaid 지원**: 선불형 잔액과 후불형 사용량을 모두 지원합니다.
 - **사용량 게이지**: 설정된 한도 대비 현재 사용량을 시각적인 게이지로 보여줍니다.
+
+### 3. OpenRouter 통합 모니터링
+- **실시간 잔액 조회**: OpenRouter Credits API를 통해 `total_credits`와 `total_usage`를 가져옵니다.
+- **잔액 계산**: 남은 크레딧(Estimated Balance)을 실시간으로 계산하여 표시합니다.
+- **사용량 분석**: 전체 누적 크레딧 대비 현재 사용량을 시각화하여 보여줍니다.
 
 ### 3. Moonshot AI 상세 잔액
 - **하이브리드 잔액 표시**: 현금 잔액(Cash)과 바우처(Voucher) 잔액을 구분하여 상세히 표시합니다.
@@ -42,6 +47,10 @@
 - **키 발급처**: [x.ai Console](https://console.x.ai/)
 - **참고**: 단순히 채팅용이 아닌, 계정 관리 및 잔액 조회가 가능한 관리자용 키를 권장합니다.
 
+### 3. OpenRouter (Management Key)
+- **필요 권한**: 크레딧 정보를 조회하려면 **Management Key** 권한이 활성화된 API 키가 필요할 수 있습니다.
+- **키 발급처**: [OpenRouter API Keys](https://openrouter.ai/keys)
+
 ### 3. Moonshot AI
 - **키 발급처**: [Moonshot AI Platform](https://platform.moonshot.cn/console/api-keys)
 
@@ -63,7 +72,7 @@
 ```bash
 npm run dev
 ```
-- Vite 기반의 빠른 핫 리로딩을 지원합니다. (기본 UI 작업 시 권장)
+- Vite 기반의 빠른 핫 리로딩을 지원합니다. (기본 UI 작업 및 로컬 API 테스트 시 권장)
 
 ### 2. 전체 기능 테스트 (Backend Proxy 포함)
 ```bash
