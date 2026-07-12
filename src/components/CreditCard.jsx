@@ -61,13 +61,31 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
 
             const totalHistory = historyArray.reduce((acc, curr) => acc + curr.total, 0);
             const totalAggregated = currentMonth + totalHistory;
+            const hasBalance = data.balance !== null && data.balance !== undefined;
 
             return (
                 <div className={isExtension ? 'space-y-3' : 'space-y-6'}>
                     <div className="flex justify-between items-end">
                         <div className="flex-1">
-                            {!isExtension && <p className="text-xs text-blue-400 uppercase tracking-widest mb-1 font-bold italic">Total Aggregated Usage</p>}
-                            <h3 className={isExtension ? 'text-2xl font-bold' : 'text-4xl font-bold'}>${Number(totalAggregated).toFixed(2)}</h3>
+                            {hasBalance ? (
+                                <>
+                                    {!isExtension && <p className="text-xs text-green-400 uppercase tracking-widest mb-1 font-bold">Available Balance</p>}
+                                    <h3 className={isExtension ? 'text-2xl font-bold' : 'text-4xl font-bold'}>${Number(data.balance).toFixed(2)}</h3>
+                                    {!isExtension && data.anchor && (
+                                        <p className="text-[9px] text-gray-500 mt-1 italic">
+                                            {new Date(data.anchor.ts * 1000).toLocaleDateString('ko-KR')} 기준 ${Number(data.anchor.amount).toFixed(2)} − 이후 사용 ${Number(data.since_anchor_usage || 0).toFixed(2)}
+                                        </p>
+                                    )}
+                                </>
+                            ) : (
+                                <>
+                                    {!isExtension && <p className="text-xs text-blue-400 uppercase tracking-widest mb-1 font-bold italic">Total Aggregated Usage</p>}
+                                    <h3 className={isExtension ? 'text-2xl font-bold' : 'text-4xl font-bold'}>${Number(totalAggregated).toFixed(2)}</h3>
+                                    {!isExtension && (
+                                        <p className="text-[9px] text-amber-400/70 mt-1 italic">설정에서 현재 잔액을 입력하면 남은 금액이 표시됩니다.</p>
+                                    )}
+                                </>
+                            )}
                         </div>
                     </div>
 
@@ -81,6 +99,12 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                                 <span className="text-gray-500">{isExtension ? 'Cached' : '과거 누적 (Cached)'}</span>
                                 <span className="text-gray-400 font-mono font-semibold">${Number(totalHistory).toFixed(2)}</span>
                             </div>
+                            {hasBalance && (
+                                <div className={`flex justify-between items-center text-[10px] border-t border-white/5 ${isExtension ? 'pt-2' : 'pt-3'}`}>
+                                    <span className="text-gray-500">{isExtension ? 'Total Usage' : '총 누적 사용량'}</span>
+                                    <span className="text-gray-400 font-mono font-semibold">${Number(totalAggregated).toFixed(2)}</span>
+                                </div>
+                            )}
                         </div>
 
                         {historyArray.length > 0 && !isExtension && (
@@ -138,6 +162,8 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
             const amount = data.balance || 0;
             const limit = data.limit;
             const team = data.team;
+            const note = data.note;
+            const isFallbackTotal = note?.includes('total purchased');
 
             return (
                 <div className={isExtension ? 'space-y-3' : 'space-y-6'}>
@@ -149,6 +175,9 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                                 </p>
                             )}
                             <h3 className={isExtension ? 'text-2xl font-bold' : 'text-4xl font-bold'}>${Number(amount).toFixed(2)}</h3>
+                            {isFallbackTotal && (
+                                <p className="text-[9px] text-amber-400/70 mt-1 italic">⚠ Total purchased (usage API unavailable)</p>
+                            )}
                         </div>
                     </div>
 
@@ -409,15 +438,15 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                     <div className={`${isExtension ? 'p-2 rounded-xl' : 'p-3 rounded-2xl'} bg-gradient-to-br transition-all duration-500
                         ${provider.id === 'openai' ? 'from-green-500/20 to-emerald-600/20 group-hover:from-green-500/30' :
                             provider.id === 'xai' ? 'from-blue-500/20 to-indigo-600/20 group-hover:from-blue-500/30' :
-                            provider.id === 'tavily' ? 'from-cyan-500/20 to-sky-600/20 group-hover:from-cyan-500/30' :
-                            provider.id === 'openrouter' ? 'from-indigo-500/20 to-purple-600/20 group-hover:from-indigo-500/30' :
-                                'from-purple-500/20 to-pink-600/20 group-hover:from-purple-500/30'}`}>
+                                provider.id === 'tavily' ? 'from-cyan-500/20 to-sky-600/20 group-hover:from-cyan-500/30' :
+                                    provider.id === 'openrouter' ? 'from-indigo-500/20 to-purple-600/20 group-hover:from-indigo-500/30' :
+                                        'from-purple-500/20 to-pink-600/20 group-hover:from-purple-500/30'}`}>
                         <Icon size={isExtension ? 16 : 24} className={
                             provider.id === 'openai' ? 'text-green-400' :
                                 provider.id === 'xai' ? 'text-blue-400' :
-                            provider.id === 'tavily' ? 'text-cyan-400' :
-                            provider.id === 'openrouter' ? 'text-indigo-400' :
-                                    'text-purple-400'
+                                    provider.id === 'tavily' ? 'text-cyan-400' :
+                                        provider.id === 'openrouter' ? 'text-indigo-400' :
+                                            'text-purple-400'
                         } />
                     </div>
                     <h2 className={`${isExtension ? 'text-sm' : 'text-lg'} font-bold mr-auto ml-3 tracking-tight`}>{provider.name}</h2>

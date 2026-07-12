@@ -22,29 +22,33 @@ export default async function handler(req, res) {
       startTs = Math.floor(startOfMonth.getTime() / 1000);
     }
 
-    // Build URL with optional end_time and limit 180 (max allowed)
-    let url = `https://api.openai.com/v1/organization/costs?start_time=${startTs}&limit=180`;
-    if (endTs) {
-      url += `&end_time=${endTs}`;
-    }
-
-    console.log(`OpenAI Proxy Request: ${url}`);
-
     let total = 0;
-    const response = await axios.get(url, {
-      headers,
-      timeout: 15000
-    });
+    let bucketCount = 0;
+    let page = null;
 
-    if (response.data?.data) {
-      response.data.data.forEach(bucket => {
-        bucket.results?.forEach(r => {
-          if (r.amount?.value) total += parseFloat(r.amount.value);
+    // Costs API returns max 180 daily buckets per page — follow pagination
+    // so long ranges (e.g. balance anchor set months ago) are fully summed.
+    do {
+      let url = `https://api.openai.com/v1/organization/costs?start_time=${startTs}&limit=180`;
+      if (endTs) url += `&end_time=${endTs}`;
+      if (page) url += `&page=${encodeURIComponent(page)}`;
+
+      const response = await axios.get(url, { headers, timeout: 15000 });
+      const body = response.data;
+
+      if (body?.data) {
+        bucketCount += body.data.length;
+        body.data.forEach(bucket => {
+          bucket.results?.forEach(r => {
+            if (r.amount?.value) total += parseFloat(r.amount.value);
+          });
         });
-      });
-    }
+      }
 
-    res.status(200).json({ total, debug: `Fetched ${response.data?.data?.length || 0} buckets` });
+      page = body?.has_more ? body?.next_page : null;
+    } while (page);
+
+    res.status(200).json({ total, debug: `Fetched ${bucketCount} buckets` });
 
   } catch (error) {
     const apiError = error.response?.data;

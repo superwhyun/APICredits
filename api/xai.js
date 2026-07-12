@@ -1,5 +1,18 @@
 import axios from 'axios';
 
+// prepaid/balance response: { changes: [...], total: { val } }
+// - All amounts are USD cents.
+// - changes: PURCHASE/REFUND are negative (credit added), SPEND is positive (credit consumed).
+// - total is the sum of changes, so a NEGATIVE total means credit remaining.
+//   Remaining balance in dollars = -total.val / 100
+const centsTotalToBalance = (total) => {
+    const raw = typeof total === 'object' && total !== null
+        ? parseFloat(total.val ?? total.amount ?? 0)
+        : parseFloat(total ?? 0);
+    if (isNaN(raw)) return null;
+    return -raw / 100;
+};
+
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ error: 'Method not allowed' });
@@ -47,57 +60,30 @@ export default async function handler(req, res) {
             return res.status(200).json({ balance: 0, note: 'No teams discovered. Ensure this is a Management API Key.' });
         }
 
-        // 2. Search for balance across all teams
+        // 2. Fetch prepaid balance per team
         let bestResult = null;
         let logs = [];
 
         for (const team of uniqueTeams) {
-            const endpoints = [
-                `/v1/billing/teams/${team.id}/prepaid/balance`,
-                `/v1/billing/teams/${team.id}/balance`,
-                `/v1/billing/teams/${team.id}/usage`
-            ];
+            try {
+                const balRes = await axios.get(`${BASE_URL}/v1/billing/teams/${team.id}/prepaid/balance`, { headers });
+                const balance = centsTotalToBalance(balRes.data?.total);
+                logs.push(`prepaid/balance team=${team.id} total=${JSON.stringify(balRes.data?.total)} -> $${balance}`);
 
-            for (const endpoint of endpoints) {
-                try {
-                    const bRes = await axios.get(`${BASE_URL}${endpoint}`, { headers });
-                    const rawData = bRes.data;
-                    const keys = Object.keys(rawData).join(', ');
-                    logs.push(`SUCCESS: ${endpoint} (Keys: ${keys})`);
-
-                    let b = 0;
-                    if (rawData.total !== undefined) {
-                        const t = rawData.total;
-                        const val = typeof t === 'object' ? (t.amount || t.val || 0) : t;
-                        b = parseFloat(val);
-                    } else {
-                        b = rawData.balance || rawData.available_balance || rawData.amount || 0;
+                if (balance !== null) {
+                    if (!bestResult || balance > bestResult.balance) {
+                        bestResult = { balance, team, note: 'prepaid credit balance' };
                     }
-
-                    if (b !== 0) {
-                        const absB = Math.abs(b);
-                        const displayBalance = absB > 100000 ? absB / 1000000 : (absB > 1000 ? absB / 100 : absB);
-
-                        const result = {
-                            balance: displayBalance,
-                            team: team,
-                            note: `Balance found via ${endpoint}`,
-                            debug: logs
-                        };
-
-                        // If it's the prepaid balance endpoint, return immediately as it's most authoritative
-                        if (endpoint.includes('prepaid/balance')) return res.status(200).json(result);
-                        if (!bestResult || displayBalance > bestResult.balance) bestResult = result;
-                    }
-                } catch (e) {
-                    logs.push(`FAIL: ${endpoint} (${e.response?.status || e.message})`);
+                    continue;
                 }
+            } catch (e) {
+                logs.push(`FAIL: prepaid/balance team=${team.id} (${e.response?.status || e.message})`);
             }
 
-            // Check postpaid
+            // Prepaid balance unavailable (e.g. pure postpaid team) -> check postpaid spending
             try {
-                const spendingRes = await axios.get(`${BASE_URL}/v1/billing/teams/${team.id}/postpaid/spending-limits`, { headers }).catch(() => null);
-                if (spendingRes && spendingRes.data.spending_limits?.monthly_limit > 0) {
+                const spendingRes = await axios.get(`${BASE_URL}/v1/billing/teams/${team.id}/postpaid/spending-limits`, { headers });
+                if (spendingRes.data.spending_limits?.monthly_limit > 0) {
                     return res.status(200).json({
                         balance: spendingRes.data.spending_limits?.current_spend || 0,
                         limit: spendingRes.data.spending_limits?.monthly_limit,
@@ -106,15 +92,16 @@ export default async function handler(req, res) {
                         debug: logs
                     });
                 }
-            } catch {
-                // Ignore postpaid lookup failures and fall back to discovered balance data.
+            } catch (e) {
+                logs.push(`FAIL: postpaid/spending-limits team=${team.id} (${e.response?.status || e.message})`);
             }
         }
 
         res.status(200).json({
-            balance: bestResult?.balance || 0,
-            team: uniqueTeams[0],
-            note: bestResult ? undefined : 'No active balance or spending limit found in any team.'
+            balance: bestResult?.balance ?? 0,
+            team: bestResult?.team || uniqueTeams[0],
+            note: bestResult ? bestResult.note : 'No prepaid balance or spending limit found in any team.',
+            debug: logs
         });
     } catch (error) {
         const errorData = error.response?.data || {};

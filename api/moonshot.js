@@ -16,7 +16,7 @@ export default async function handler(req, res) {
             'Authorization': `Bearer ${apiKey}`,
         };
 
-        const domains = ['api.moonshot.cn', 'api.moonshot.ai'];
+        const domains = ['api.moonshot.ai', 'api.moonshot.ai'];
         let lastError = null;
 
         for (const domain of domains) {

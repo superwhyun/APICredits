@@ -52,7 +52,7 @@
 - **키 발급처**: [OpenRouter API Keys](https://openrouter.ai/keys)
 
 ### 3. Moonshot AI
-- **키 발급처**: [Moonshot AI Platform](https://platform.moonshot.cn/console/api-keys)
+- **키 발급처**: [Moonshot AI Platform](https://platform.moonshot.ai/console/api-keys)
 
 ### 4. RunPod (API Key with GraphQL Permissions)
 - **키 발급처**: [RunPod Console - Settings](https://www.runpod.io/console/settings)

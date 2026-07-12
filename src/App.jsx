@@ -14,10 +14,10 @@ const PROVIDERS = [
 ];
 
 const isExtension = typeof globalThis.chrome !== 'undefined' && globalThis.chrome.runtime?.id;
-const isLocalDev = typeof window !== 'undefined' && 
-  (window.location.hostname.includes('localhost') || 
-   window.location.hostname === '127.0.0.1' || 
-   window.location.hostname.startsWith('192.168.'));
+const isLocalDev = typeof window !== 'undefined' &&
+  (window.location.hostname.includes('localhost') ||
+    window.location.hostname === '127.0.0.1' ||
+    window.location.hostname.startsWith('192.168.'));
 
 const fetchTavilyUsage = async (apiKey) => {
   const response = await fetch('https://api.tavily.com/usage', {
@@ -52,6 +52,14 @@ export default function App() {
     return saved ? JSON.parse(saved) : {};
   });
 
+  // OpenAI has no balance API — the user records their current balance once
+  // (from platform.openai.com Billing) and we subtract costs accrued since then.
+  const [openaiAnchor, setOpenaiAnchor] = useState(() => {
+    const saved = localStorage.getItem('openai_balance_anchor');
+    return saved ? JSON.parse(saved) : null;
+  });
+  const [anchorInput, setAnchorInput] = useState('');
+
   const [data, setData] = useState({ openai: null, xai: null, moonshot: null, runpod: null, tavily: null, openrouter: null });
   const [loading, setLoading] = useState({ openai: false, xai: false, moonshot: false, runpod: false, tavily: false, openrouter: false });
   const [progressMessages, setProgressMessages] = useState({ openai: '', xai: '', moonshot: '', runpod: '', tavily: '', openrouter: '' });
@@ -64,7 +72,7 @@ export default function App() {
   // Initial fetch on mount
   useEffect(() => {
     refreshAll();
-    
+
     console.log('App Mode:', { isExtension, isLocalDev, host: window.location.hostname });
 
     // Fix extension popup size
@@ -81,10 +89,39 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchOpenAIData = async (forceHistory = false) => {
+  // Sum of OpenAI costs (USD) between two unix timestamps, following pagination.
+  const fetchOpenAICostsTotal = async (apiKey, startTs, endTs) => {
+    if (isExtension || isLocalDev) {
+      let total = 0;
+      let page = null;
+      do {
+        let url = `https://api.openai.com/v1/organization/costs?start_time=${startTs}&limit=180`;
+        if (endTs) url += `&end_time=${endTs}`;
+        if (page) url += `&page=${encodeURIComponent(page)}`;
+        const response = await axios.get(url, {
+          headers: { 'Authorization': `Bearer ${apiKey}` }
+        });
+        const body = response.data;
+        if (body?.data) {
+          body.data.forEach(bucket => {
+            bucket.results?.forEach(r => {
+              if (r.amount?.value) total += parseFloat(r.amount.value);
+            });
+          });
+        }
+        page = body?.has_more ? body?.next_page : null;
+      } while (page);
+      return total;
+    }
+    const response = await axios.post(`/api/openai`, { apiKey, startTime: startTs, endTime: endTs });
+    return response.data.total;
+  };
+
+  const fetchOpenAIData = async (forceHistory = false, anchorOverride = undefined) => {
     const providerId = 'openai';
     if (!keys[providerId]) return;
 
+    const anchor = anchorOverride !== undefined ? anchorOverride : openaiAnchor;
     setLoading(prev => ({ ...prev, [providerId]: true }));
     let currentCache = forceHistory ? {} : { ...openaiCache };
     const now = new Date();
@@ -102,31 +139,7 @@ export default function App() {
           const startTs = Math.floor(d.getTime() / 1000);
           const endTs = Math.floor(new Date(d.getFullYear(), d.getMonth() + 1, 1).getTime() / 1000);
 
-          let response;
-          if (isExtension || isLocalDev) {
-            let url = `https://api.openai.com/v1/organization/costs?start_time=${startTs}&limit=180&end_time=${endTs}`;
-            response = await axios.get(url, {
-              headers: { 'Authorization': `Bearer ${keys[providerId]}` }
-            });
-            // Map common format
-            let total = 0;
-            if (response.data?.data) {
-              response.data.data.forEach(bucket => {
-                bucket.results?.forEach(r => {
-                  if (r.amount?.value) total += parseFloat(r.amount.value);
-                });
-              });
-            }
-            response.data = { total };
-          } else {
-            response = await axios.post(`/api/openai`, {
-              apiKey: keys[providerId],
-              startTime: startTs,
-              endTime: endTs
-            });
-          }
-
-          currentCache[monthKey] = response.data.total;
+          currentCache[monthKey] = await fetchOpenAICostsTotal(keys[providerId], startTs, endTs);
           localStorage.setItem('openai_monthly_cache', JSON.stringify(currentCache));
           setOpenaiCache({ ...currentCache });
         }
@@ -134,33 +147,26 @@ export default function App() {
 
       // 2. Fetch current month always
       setProgressMessages(prev => ({ ...prev, [providerId]: `이번 달 요금 가져오는 중...` }));
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const currentMonthTotal = await fetchOpenAICostsTotal(keys[providerId], Math.floor(startOfMonth.getTime() / 1000));
 
-      let response;
-      if (isExtension || isLocalDev) {
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const startTs = Math.floor(startOfMonth.getTime() / 1000);
-        let url = `https://api.openai.com/v1/organization/costs?start_time=${startTs}&limit=180`;
-        response = await axios.get(url, {
-          headers: { 'Authorization': `Bearer ${keys[providerId]}` }
-        });
-        let total = 0;
-        if (response.data?.data) {
-          response.data.data.forEach(bucket => {
-            bucket.results?.forEach(r => {
-              if (r.amount?.value) total += parseFloat(r.amount.value);
-            });
-          });
-        }
-        response.data = { total };
-      } else {
-        response = await axios.post(`/api/openai`, { apiKey: keys[providerId] });
+      // 3. Remaining balance = anchor amount - costs accrued since the anchor
+      let balance = null;
+      let sinceAnchorUsage = null;
+      if (anchor?.amount != null && anchor?.ts) {
+        setProgressMessages(prev => ({ ...prev, [providerId]: `잔액 계산 중...` }));
+        sinceAnchorUsage = await fetchOpenAICostsTotal(keys[providerId], anchor.ts);
+        balance = anchor.amount - sinceAnchorUsage;
       }
 
       setData(prev => ({
         ...prev,
         [providerId]: {
-          current_month_total: response.data.total,
-          history: currentCache
+          current_month_total: currentMonthTotal,
+          history: currentCache,
+          balance,
+          anchor,
+          since_anchor_usage: sinceAnchorUsage
         }
       }));
     } catch (error) {
@@ -188,7 +194,9 @@ export default function App() {
       } else if (isExtension || isLocalDev) {
         const headers = { 'Authorization': `Bearer ${apiKey}` };
 
-        if (providerId === 'xai') {
+        if (providerId === 'xai' && !isExtension) {
+          response = await axios.post('/api/xai', { apiKey });
+        } else if (providerId === 'xai') {
           const baseMgmtUrl = 'https://management-api.x.ai';
           let teams = [];
           try {
@@ -212,42 +220,32 @@ export default function App() {
 
           const uniqueTeams = Array.from(new Map(teams.filter(t => t && t.id).map(t => [t.id, t])).values());
           let bestResult = null;
+
+          // prepaid/balance: all amounts are USD cents. PURCHASE/REFUND changes are
+          // negative (credit added), SPEND is positive, so a NEGATIVE total means
+          // credit remaining. Remaining dollars = -total.val / 100
+          const centsTotalToBalance = (total) => {
+            const raw = typeof total === 'object' && total !== null
+              ? parseFloat(total.val ?? total.amount ?? 0)
+              : parseFloat(total ?? 0);
+            if (isNaN(raw)) return null;
+            return -raw / 100;
+          };
+
           for (const team of uniqueTeams) {
-            const endpoints = [
-              `/v1/billing/teams/${team.id}/prepaid/balance`,
-              `/v1/billing/teams/${team.id}/balance`,
-              `/v1/billing/teams/${team.id}/usage`
-            ];
-            for (const endpoint of endpoints) {
-              try {
-                const bRes = await axios.get(`${baseMgmtUrl}${endpoint}`, { headers });
-                const rawData = bRes.data;
-                let b = 0;
-                if (rawData.total !== undefined) {
-                  const t = rawData.total;
-                  const val = typeof t === 'object' ? (t.amount || t.val || 0) : t;
-                  b = parseFloat(val);
-                } else {
-                  b = rawData.balance || rawData.available_balance || rawData.amount || 0;
+            // 1. Prepaid credit balance
+            try {
+              const balRes = await axios.get(`${baseMgmtUrl}/v1/billing/teams/${team.id}/prepaid/balance`, { headers });
+              const balance = centsTotalToBalance(balRes.data?.total);
+              if (balance !== null) {
+                if (!bestResult || balance > bestResult.balance) {
+                  bestResult = { balance, team, note: 'prepaid credit balance' };
                 }
-
-                if (b !== 0) {
-                  const absB = Math.abs(b);
-                  const displayBalance = absB > 100000 ? absB / 1000000 : (absB > 1000 ? absB / 100 : absB);
-                  const result = { balance: displayBalance, team: team };
-                  if (endpoint.includes('prepaid/balance')) {
-                    bestResult = result;
-                    break;
-                  }
-                  if (!bestResult || displayBalance > bestResult.balance) bestResult = result;
-                }
-              } catch {
-                // Ignore per-endpoint failures while probing x.ai billing APIs.
+                continue;
               }
-            }
-            if (bestResult?.balance !== 0 && bestResult !== null) break;
+            } catch { /* ignore */ }
 
-            // Check postpaid
+            // 2. Prepaid unavailable (pure postpaid team) -> current spend vs limit
             try {
               const spendingRes = await axios.get(`${baseMgmtUrl}/v1/billing/teams/${team.id}/postpaid/spending-limits`, { headers });
               if (spendingRes.data.spending_limits?.monthly_limit > 0) {
@@ -256,18 +254,11 @@ export default function App() {
                 bestResult = { balance: spend, team: team, isPostpaid: true, limit: limit };
                 break;
               }
-            } catch {
-              // Ignore postpaid lookup failures and keep the best discovered result.
-            }
+            } catch { /* ignore */ }
           }
-          response = { data: bestResult || { balance: 0, team: uniqueTeams[0] } };
+          response = { data: bestResult || { balance: 0, team: uniqueTeams[0], note: 'No prepaid balance or spending limit found in any team.' } };
         } else if (providerId === 'moonshot') {
-          // Try both domains as in proxy
-          try {
-            response = await axios.get('https://api.moonshot.cn/v1/users/me/balance', { headers });
-          } catch {
-            response = await axios.get('https://api.moonshot.ai/v1/users/me/balance', { headers });
-          }
+          response = await axios.get('https://api.moonshot.ai/v1/users/me/balance', { headers });
         } else if (providerId === 'runpod') {
           const gqlResponse = await axios.post(
             `https://api.runpod.io/graphql?api_key=${apiKey}`,
@@ -355,7 +346,60 @@ export default function App() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-8 pt-6 border-t border-white/5 flex items-center justify-between">
+                <div className="mt-6 pt-6 border-t border-white/5">
+                  <label className="text-sm font-medium text-gray-400 px-1">OpenAI 현재 잔액 (기준점)</label>
+                  <p className="text-[10px] text-gray-600 px-1 mt-1 leading-relaxed">
+                    OpenAI는 잔액 조회 API를 제공하지 않습니다. platform.openai.com → Billing에서 현재 잔액을 확인해 입력하면,
+                    이후 사용량을 차감해 잔액을 계산합니다. 크레딧을 충전하면 다시 설정하세요.
+                  </p>
+                  <div className="flex items-center gap-3 mt-3">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={anchorInput}
+                      onChange={(e) => setAnchorInput(e.target.value)}
+                      className="w-40 bg-[#16161a] border border-white/10 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none transition-all placeholder:text-gray-600"
+                      placeholder="예: 42.50"
+                    />
+                    <button
+                      onClick={() => {
+                        const amount = parseFloat(anchorInput);
+                        if (isNaN(amount) || amount < 0) {
+                          alert('올바른 금액을 입력해주세요.');
+                          return;
+                        }
+                        const anchor = { amount, ts: Math.floor(Date.now() / 1000) };
+                        localStorage.setItem('openai_balance_anchor', JSON.stringify(anchor));
+                        setOpenaiAnchor(anchor);
+                        setAnchorInput('');
+                        fetchOpenAIData(false, anchor);
+                      }}
+                      className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl font-medium text-xs transition-colors"
+                    >
+                      잔액 기준 설정
+                    </button>
+                    {openaiAnchor && (
+                      <>
+                        <span className="text-xs text-gray-500">
+                          현재 기준: <span className="text-blue-400 font-mono">${Number(openaiAnchor.amount).toFixed(2)}</span>
+                          {' '}({new Date(openaiAnchor.ts * 1000).toLocaleDateString('ko-KR')})
+                        </span>
+                        <button
+                          onClick={() => {
+                            localStorage.removeItem('openai_balance_anchor');
+                            setOpenaiAnchor(null);
+                            fetchOpenAIData(false, null);
+                          }}
+                          className="text-xs text-red-400/70 hover:text-red-300 underline"
+                        >
+                          해제
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="mt-6 pt-6 border-t border-white/5 flex items-center justify-between">
                   <div className="flex items-center gap-4">
                     <div className="flex items-center gap-2 text-xs text-gray-500">
                       <ShieldCheck size={14} className="text-green-500" />
