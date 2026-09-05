@@ -38,12 +38,24 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
         }
 
         if (data.error) {
+            // Error bodies can arrive as a string, or as a nested object (e.g. an
+            // OpenAI/OpenRouter-style { message, code } shape). Rendering an object
+            // directly as a React child throws and unmounts the whole app, so always
+            // reduce to a string here.
+            const toErrorText = (value, fallback) => {
+                if (typeof value === 'string') return value;
+                if (value && typeof value === 'object') return value.message || JSON.stringify(value);
+                return fallback;
+            };
+            const errorTitle = toErrorText(data.error, 'Failed to fetch');
+            const errorDetail = toErrorText(data.message, 'Check your permissions.');
+
             return (
                 <div className={`${isExtension ? 'p-2' : 'p-4'} rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-start gap-2`}>
                     <AlertCircle size={isExtension ? 14 : 18} className="shrink-0 mt-0.5" />
                     <div className="text-xs space-y-1">
-                        <p className="font-semibold">{data.error}</p>
-                        {!isExtension && <p className="opacity-80 leading-relaxed text-[10px]">{data.message || 'Check your permissions.'}</p>}
+                        <p className="font-semibold">{errorTitle}</p>
+                        {!isExtension && <p className="opacity-80 leading-relaxed text-[10px]">{errorDetail}</p>}
                     </div>
                 </div>
             );

@@ -19,6 +19,30 @@ const isLocalDev = typeof window !== 'undefined' &&
     window.location.hostname === '127.0.0.1' ||
     window.location.hostname.startsWith('192.168.'));
 
+// API error bodies vary by provider shape (plain string, { message }, or
+// OpenAI-style { error: { message, code } }). Always reduce to a display string
+// so a raw error object never reaches JSX as a child (React throws and the
+// whole tree unmounts if it does).
+const stringifyError = (value) => {
+  if (!value) return null;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') {
+    if (typeof value.message === 'string') return value.message;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+};
+
+const toDisplayError = (rawData, fallbackMessage) => {
+  const errorText = stringifyError(rawData?.error) || stringifyError(rawData) || 'Failed to fetch';
+  const messageText = stringifyError(rawData?.message) || fallbackMessage || 'Check your permissions.';
+  return { error: errorText, message: messageText };
+};
+
 const fetchTavilyUsage = async (apiKey) => {
   const response = await fetch('https://api.tavily.com/usage', {
     method: 'GET',
@@ -277,7 +301,7 @@ export default function App() {
       setData(prev => ({ ...prev, [providerId]: response.data }));
     } catch (error) {
       console.error(`Error fetching ${providerId}:`, error);
-      setData(prev => ({ ...prev, [providerId]: error.response?.data || { error: 'Failed to fetch', message: error.message } }));
+      setData(prev => ({ ...prev, [providerId]: toDisplayError(error.response?.data, error.message) }));
     } finally {
       setLoading(prev => ({ ...prev, [providerId]: false }));
     }
