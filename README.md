@@ -2,6 +2,8 @@
 
 현존하는 주요 AI 서비스(OpenAI, x.ai, OpenRouter, Moonshot AI, RunPod, Tavily)의 사용량과 크레딧 잔액을 한곳에서 쉽고 빠르게 모니터링할 수 있는 프리미엄 대시보드입니다.
 
+> **다른 PC에 설치하려면?** 앱스토어 배포 없이 GitHub에서 클론해 직접 로드하는 방식입니다. [다른 장비에 설치하기](#다른-장비에-설치하기-chrome-extension) 절차를 따르면 5분 안에 끝납니다.
+
 ## 주요 기능 (Key Features)
 
 ### 1. OpenAI 지능형 모니터링
@@ -18,19 +20,19 @@
 - **잔액 계산**: 남은 크레딧(Estimated Balance)을 실시간으로 계산하여 표시합니다.
 - **사용량 분석**: 전체 누적 크레딧 대비 현재 사용량을 시각화하여 보여줍니다.
 
-### 3. Moonshot AI 상세 잔액
+### 4. Moonshot AI 상세 잔액
 - **하이브리드 잔액 표시**: 현금 잔액(Cash)과 바우처(Voucher) 잔액을 구분하여 상세히 표시합니다.
 - **만료 안내**: 바우처의 경우 만료 기한이 있을 수 있음을 알려주는 안내 메시지를 한국어로 제공합니다.
 
-### 4. RunPod GPU 클라우드 잔액
+### 5. RunPod GPU 클라우드 잔액
 - **실시간 잔액 조회**: GraphQL API를 통해 현재 계정의 `clientBalance`를 실시간으로 가져옵니다.
 - **통합 모니터링**: GPU 및 서버리스 환경에 최적화된 잔액 정보를 대시보드에서 한눈에 확인할 수 있습니다.
 
-### 5. Tavily 크레딧 조회
+### 6. Tavily 크레딧 조회
 - **실시간 크레딧 확인**: Tavily Usage API를 통해 남은 크레딧과 사용량을 즉시 확인합니다.
 - **플랜/리셋일 표시**: 현재 플랜과 크레딧 리셋 일자를 함께 보여줍니다.
 
-### 6. 보안 및 성능 (Privacy & Performance)
+### 7. 보안 및 성능 (Privacy & Performance)
 - **로컬 저장**: 모든 API Key와 월별 캐시 데이터는 사용자의 브라우저(`localStorage`)에만 저장됩니다. 서버에는 절대 전송되지 않습니다.
 - **Vercel Proxy**: API Key 노출을 방지하기 위해 Vercel Serverless Functions를 프록시로 사용하여 안전하게 데이터를 요청합니다.
 
@@ -51,14 +53,14 @@
 - **필요 권한**: 크레딧 정보를 조회하려면 **Management Key** 권한이 활성화된 API 키가 필요할 수 있습니다.
 - **키 발급처**: [OpenRouter API Keys](https://openrouter.ai/keys)
 
-### 3. Moonshot AI
+### 4. Moonshot AI
 - **키 발급처**: [Moonshot AI Platform](https://platform.moonshot.ai/console/api-keys)
 
-### 4. RunPod (API Key with GraphQL Permissions)
+### 5. RunPod (API Key with GraphQL Permissions)
 - **키 발급처**: [RunPod Console - Settings](https://www.runpod.io/console/settings)
 - **필요 권한**: 반드시 **GraphQL** (Read 또는 Full Access) 권한이 포함된 API Key여야 잔액 조회가 가능합니다.
 
-### 5. Tavily
+### 6. Tavily
 - **키 발급처**: [Tavily Dashboard](https://app.tavily.com/home)
 - **필요 권한**: Usage 조회가 가능한 일반 Tavily API Key를 사용하면 됩니다.
 
@@ -97,28 +99,62 @@ npx vercel
 
 ---
 
-## 크롬 익스텐션 설치 가이드 (Chrome Extension)
+## 다른 장비에 설치하기 (Chrome Extension)
 
-이 대시보드를 브라우저 우측 상단에서 팝업으로 편리하게 사용할 수 있습니다.
+이 프로젝트는 크롬 웹스토어에 올리지 않습니다. 새 PC에서는 GitHub에서 클론한 뒤 직접 빌드해서 "압축해제된 확장 프로그램"으로 로드합니다. 익스텐션 모드에서는 Vercel 서버가 필요 없고, 모든 API 호출이 브라우저에서 각 서비스로 직접 나갑니다.
 
-### 1. 빌드하기
+### 준비물
+- **Node.js 20 이상** (개발은 22에서 확인) — [nodejs.org](https://nodejs.org/) 또는 `nvm`, `brew install node`
+- **Git**
+- **Chrome** (또는 Edge, Brave 등 Chromium 계열)
+
+### 1. 클론하고 빌드
 ```bash
+git clone https://github.com/superwhyun/APICredits.git
+cd APICredits
+npm install
 npm run build
 ```
+- 빌드 결과물은 `dist/` 폴더에 생성됩니다. 이 폴더가 곧 익스텐션입니다.
+- `dist/`는 `.gitignore`에 포함되어 있어 저장소에 없습니다. **클론 직후에는 반드시 빌드해야 합니다.**
 
-### 2. 크롬에 로드하기
-1. 크롬 브라우저에서 `chrome://extensions`에 접속합니다.
-2. 우측 상단의 **개발자 모드(Developer mode)**를 켭니다.
-3. **압축해제된 확장 프로그램을 로드합니다(Load unpacked)** 버튼을 클릭합니다.
-4. 프로젝트 폴더 내의 `dist` 폴더를 선택합니다.
+### 2. 크롬에 로드
+1. 주소창에 `chrome://extensions` 입력
+2. 우측 상단 **개발자 모드(Developer mode)** 켜기
+3. **압축해제된 확장 프로그램을 로드합니다(Load unpacked)** 클릭
+4. 방금 클론한 폴더 안의 **`dist`** 폴더 선택 (프로젝트 루트가 아니라 `dist`)
+5. 툴바의 퍼즐 아이콘 → `AI Credit Dashboard` 옆 핀 아이콘으로 고정
 
-### 3. 사용하기
-- 브라우저 툴바의 퍼즐 아이콘을 눌러 `AI Credit Dashboard`를 고정(Pin)합니다.
-- 대시보드 아이콘을 클릭하면 즉시 잔액을 확인할 수 있습니다.
-- **하이브리드 통신**: 익스텐션 모드에서는 **Direct API 호출** 방식을 사용합니다. 
-  - **장점**: Vercel 프록시 서버를 거치지 않아 응답이 더 빠르고, API Key가 당신의 브라우저 밖으로 절대 나가지 않아 더 안전합니다.
-  - **보안**: 모든 통신은 크롬의 보안 권한(`host_permissions`) 내에서 직접 이루어집니다.
+### 3. API 키 입력
+익스텐션 아이콘을 클릭한 뒤 우측 상단 톱니바퀴(설정)에서 키를 입력합니다.
 
+- 키는 **이 브라우저의 `localStorage`에만** 저장됩니다. 서버로 전송되지 않고, 크롬 계정 동기화도 되지 않으므로 **장비마다 다시 입력**해야 합니다.
+- 각 서비스별 필요한 키 종류는 위의 [API 설정 가이드](#api-설정-가이드-api-key-requirements)를 참고하세요. 특히 x.ai는 일반 키가 아닌 **Management Key**, RunPod은 **GraphQL 권한** 키가 필요합니다.
+- **OpenAI는 키 입력 후 "현재 잔액(기준점)"도 설정**해야 잔액이 표시됩니다. [platform.openai.com → Billing](https://platform.openai.com/settings/organization/billing/overview)에서 현재 잔액을 확인해 그대로 입력하세요. 크레딧을 충전한 뒤에도 다시 설정합니다.
+
+### 4. 업데이트하기
+코드가 바뀌면 다시 빌드하고 크롬에서 새로고침만 하면 됩니다. 키와 캐시는 그대로 유지됩니다.
+```bash
+cd APICredits
+git pull
+npm install        # 의존성이 바뀌었을 수 있으니 함께 실행
+npm run build
+```
+그다음 `chrome://extensions`에서 `AI Credit Dashboard` 카드의 **새로고침(↻)** 버튼을 누릅니다.
+
+### 5. 문제 해결
+| 증상 | 원인과 조치 |
+|---|---|
+| 팝업이 새까맣게 나오거나 비어 있음 | `dist/`가 없거나 오래된 빌드입니다. `npm run build` 후 익스텐션 새로고침 |
+| 키를 다시 입력해야 함 / 캐시가 사라짐 | 압축해제된 익스텐션의 ID는 **폴더 경로**로 정해집니다. 폴더를 옮기거나 이름을 바꾸면 새 익스텐션으로 인식되어 `localStorage`가 초기화됩니다. 경로를 고정해 두세요 |
+| x.ai 잔액이 0 또는 오류 | 일반 API 키를 넣은 경우입니다. [console.x.ai](https://console.x.ai/)에서 Management Key를 발급받아 사용하세요 |
+| OpenAI 카드에 잔액 대신 사용량만 표시 | 기준 잔액을 아직 설정하지 않은 상태입니다. 설정에서 현재 잔액을 입력하세요 |
+| `npm install` 실패 | Node.js 버전을 확인하세요 (`node -v`가 20 이상이어야 합니다) |
+
+### 참고: 익스텐션 모드의 통신 방식
+- 익스텐션에서는 Vercel 프록시를 거치지 않고 `manifest.json`의 `host_permissions`에 허용된 도메인으로 **직접 호출**합니다.
+- 응답이 빠르고, API Key가 브라우저 밖으로 나가지 않습니다.
+- 새 서비스를 추가하면 `public/manifest.json`의 `host_permissions`에 해당 도메인을 넣고 다시 빌드해야 합니다.
 
 ---
 
