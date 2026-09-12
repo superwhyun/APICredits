@@ -1,17 +1,5 @@
 import axios from 'axios';
-
-// prepaid/balance response: { changes: [...], total: { val } }
-// - All amounts are USD cents.
-// - changes: PURCHASE/REFUND are negative (credit added), SPEND is positive (credit consumed).
-// - total is the sum of changes, so a NEGATIVE total means credit remaining.
-//   Remaining balance in dollars = -total.val / 100
-const centsTotalToBalance = (total) => {
-    const raw = typeof total === 'object' && total !== null
-        ? parseFloat(total.val ?? total.amount ?? 0)
-        : parseFloat(total ?? 0);
-    if (isNaN(raw)) return null;
-    return -raw / 100;
-};
+import { XAI_MANAGEMENT_BASE_URL, fetchPrepaidBalance } from '../src/lib/xaiBalance.js';
 
 export default async function handler(req, res) {
     if (req.method !== 'POST') {
@@ -30,7 +18,7 @@ export default async function handler(req, res) {
         };
 
         // Management API Base URL
-        const BASE_URL = 'https://management-api.x.ai';
+        const BASE_URL = XAI_MANAGEMENT_BASE_URL;
 
         // 1. Discover Teams
         let teams = [];
@@ -66,13 +54,16 @@ export default async function handler(req, res) {
 
         for (const team of uniqueTeams) {
             try {
-                const balRes = await axios.get(`${BASE_URL}/v1/billing/teams/${team.id}/prepaid/balance`, { headers });
-                const balance = centsTotalToBalance(balRes.data?.total);
-                logs.push(`prepaid/balance team=${team.id} total=${JSON.stringify(balRes.data?.total)} -> $${balance}`);
+                const result = await fetchPrepaidBalance({
+                    teamId: team.id,
+                    get: (url) => axios.get(url, { headers }).then(r => r.data),
+                    post: (url, body) => axios.post(url, body, { headers }).then(r => r.data),
+                });
+                logs.push(`prepaid/balance team=${team.id} settled=$${result?.settledBalance} pending=$${result?.pendingUsage} since=${result?.pendingUsageSince} usageError=${result?.usageError}`);
 
-                if (balance !== null) {
-                    if (!bestResult || balance > bestResult.balance) {
-                        bestResult = { balance, team, note: 'prepaid credit balance' };
+                if (result !== null) {
+                    if (!bestResult || result.balance > bestResult.balance) {
+                        bestResult = { ...result, team, note: 'prepaid credit balance' };
                     }
                     continue;
                 }
@@ -98,6 +89,7 @@ export default async function handler(req, res) {
         }
 
         res.status(200).json({
+            ...(bestResult ?? {}),
             balance: bestResult?.balance ?? 0,
             team: bestResult?.team || uniqueTeams[0],
             note: bestResult ? bestResult.note : 'No prepaid balance or spending limit found in any team.',

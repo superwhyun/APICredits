@@ -85,7 +85,8 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                                     <h3 className={isExtension ? 'text-2xl font-bold' : 'text-4xl font-bold'}>${Number(data.balance).toFixed(2)}</h3>
                                     {!isExtension && data.anchor && (
                                         <p className="text-[9px] text-gray-500 mt-1 italic">
-                                            {new Date(data.anchor.ts * 1000).toLocaleDateString('ko-KR')} 기준 ${Number(data.anchor.amount).toFixed(2)} − 이후 사용 ${Number(data.since_anchor_usage || 0).toFixed(2)}
+                                            {new Date(data.anchor.ts * 1000).toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' })} 기준 ${Number(data.anchor.amount).toFixed(2)} − 이후 사용 ${Number(data.since_anchor_usage || 0).toFixed(2)}
+                                            {data.anchor.dayStartTs == null && <span className="text-amber-400/80"> (기준을 다시 설정하면 당일 이중 차감이 사라집니다)</span>}
                                         </p>
                                     )}
                                 </>
@@ -174,8 +175,10 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
             const amount = data.balance || 0;
             const limit = data.limit;
             const team = data.team;
-            const note = data.note;
-            const isFallbackTotal = note?.includes('total purchased');
+            const pendingUsage = Number(data.pendingUsage || 0);
+            const settledBalance = data.settledBalance;
+            const usageError = data.usageError;
+            const hasPendingBreakdown = !isPostpaid && settledBalance !== undefined && settledBalance !== null;
 
             return (
                 <div className={isExtension ? 'space-y-3' : 'space-y-6'}>
@@ -187,8 +190,8 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                                 </p>
                             )}
                             <h3 className={isExtension ? 'text-2xl font-bold' : 'text-4xl font-bold'}>${Number(amount).toFixed(2)}</h3>
-                            {isFallbackTotal && (
-                                <p className="text-[9px] text-amber-400/70 mt-1 italic">⚠ Total purchased (usage API unavailable)</p>
+                            {usageError && (
+                                <p className="text-[9px] text-amber-400/70 mt-1 italic">⚠ 미정산 사용량 조회 실패 — 정산된 잔액만 표시 ({usageError})</p>
                             )}
                         </div>
                     </div>
@@ -203,6 +206,19 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                                 <div className={`flex justify-between items-center text-[10px] border-t border-white/5 ${isExtension ? 'pt-2' : 'pt-3'}`}>
                                     <span className="text-gray-500 font-medium">{isExtension ? 'Type' : 'Team ID'}</span>
                                     <span className="text-gray-400 font-mono">{isExtension ? (isPostpaid ? 'Postpaid' : 'Prepaid') : team.id}</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {hasPendingBreakdown && (
+                            <div className={`${isExtension ? 'p-3' : 'p-4'} rounded-2xl bg-white/5 border border-white/5 space-y-2`}>
+                                <div className="flex justify-between items-center text-[10px]">
+                                    <span className="text-gray-500 font-medium">{isExtension ? 'Settled' : 'Settled Balance'}</span>
+                                    <span className="text-gray-300 font-mono font-semibold">${Number(settledBalance).toFixed(2)}</span>
+                                </div>
+                                <div className={`flex justify-between items-center text-[10px] border-t border-white/5 ${isExtension ? 'pt-2' : 'pt-3'}`}>
+                                    <span className="text-gray-500 font-medium">{isExtension ? 'Pending Usage' : 'Unsettled Usage (not yet billed)'}</span>
+                                    <span className="text-red-400/80 font-mono font-semibold">-${pendingUsage.toFixed(2)}</span>
                                 </div>
                             </div>
                         )}
@@ -227,7 +243,7 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                             <div className="flex items-start gap-2 px-1 opacity-50">
                                 <Info size={12} className="shrink-0 mt-0.5" />
                                 <p className="text-[9px] leading-relaxed italic">
-                                    x.ai의 실시간 사용량 및 잔액 정보입니다. 관리자 API 키를 통해 가져온 데이터입니다.
+                                    x.ai는 사용량을 매월 한 번 정산합니다. 정산된 잔액에서 아직 청구되지 않은 사용량을 빼서 실제 잔액을 표시합니다.
                                 </p>
                             </div>
                         )}

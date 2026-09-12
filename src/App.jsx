@@ -3,6 +3,7 @@ import { Settings, RefreshCw, Key, ShieldCheck, LayoutDashboard, Info } from 'lu
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import CreditCard from './components/CreditCard';
 import axios from 'axios';
+import { XAI_MANAGEMENT_BASE_URL, fetchPrepaidBalance } from './lib/xaiBalance';
 
 const PROVIDERS = [
   { id: 'openai', name: 'OpenAI', icon: 'zap' },
@@ -141,6 +142,32 @@ export default function App() {
     return response.data.total;
   };
 
+  // Costs API only buckets by whole UTC days and snaps start_time down to the
+  // bucket start, so usage "since the anchor" must be measured from the UTC
+  // midnight of the anchor day, minus what had already accrued that day when
+  // the anchor was recorded (that part is already reflected in the balance
+  // the user copied from the dashboard).
+  const utcDayStartTs = (ts) => {
+    const d = new Date(ts * 1000);
+    return Math.floor(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) / 1000);
+  };
+
+  const createOpenAIAnchor = async (apiKey, amount) => {
+    const ts = Math.floor(Date.now() / 1000);
+    const dayStartTs = utcDayStartTs(ts);
+    const dayUsageAtAnchor = await fetchOpenAICostsTotal(apiKey, dayStartTs);
+    return { amount, ts, dayStartTs, dayUsageAtAnchor };
+  };
+
+  const fetchOpenAIUsageSinceAnchor = async (apiKey, anchor) => {
+    // Legacy anchors (no dayStartTs) fall back to the old, day-snapped query.
+    if (anchor.dayStartTs == null || anchor.dayUsageAtAnchor == null) {
+      return fetchOpenAICostsTotal(apiKey, anchor.ts);
+    }
+    const sinceDayStart = await fetchOpenAICostsTotal(apiKey, anchor.dayStartTs);
+    return sinceDayStart - anchor.dayUsageAtAnchor;
+  };
+
   const fetchOpenAIData = async (forceHistory = false, anchorOverride = undefined) => {
     const providerId = 'openai';
     if (!keys[providerId]) return;
@@ -179,7 +206,7 @@ export default function App() {
       let sinceAnchorUsage = null;
       if (anchor?.amount != null && anchor?.ts) {
         setProgressMessages(prev => ({ ...prev, [providerId]: `잔액 계산 중...` }));
-        sinceAnchorUsage = await fetchOpenAICostsTotal(keys[providerId], anchor.ts);
+        sinceAnchorUsage = await fetchOpenAIUsageSinceAnchor(keys[providerId], anchor);
         balance = anchor.amount - sinceAnchorUsage;
       }
 
@@ -221,7 +248,7 @@ export default function App() {
         if (providerId === 'xai' && !isExtension) {
           response = await axios.post('/api/xai', { apiKey });
         } else if (providerId === 'xai') {
-          const baseMgmtUrl = 'https://management-api.x.ai';
+          const baseMgmtUrl = XAI_MANAGEMENT_BASE_URL;
           let teams = [];
           try {
             const validRes = await axios.get(`${baseMgmtUrl}/auth/management-keys/validation`, { headers });
@@ -245,25 +272,16 @@ export default function App() {
           const uniqueTeams = Array.from(new Map(teams.filter(t => t && t.id).map(t => [t.id, t])).values());
           let bestResult = null;
 
-          // prepaid/balance: all amounts are USD cents. PURCHASE/REFUND changes are
-          // negative (credit added), SPEND is positive, so a NEGATIVE total means
-          // credit remaining. Remaining dollars = -total.val / 100
-          const centsTotalToBalance = (total) => {
-            const raw = typeof total === 'object' && total !== null
-              ? parseFloat(total.val ?? total.amount ?? 0)
-              : parseFloat(total ?? 0);
-            if (isNaN(raw)) return null;
-            return -raw / 100;
-          };
+          const xaiGet = (url) => axios.get(url, { headers }).then(r => r.data);
+          const xaiPost = (url, body) => axios.post(url, body, { headers }).then(r => r.data);
 
           for (const team of uniqueTeams) {
-            // 1. Prepaid credit balance
+            // 1. Prepaid credit balance (settled ledger minus not-yet-settled usage)
             try {
-              const balRes = await axios.get(`${baseMgmtUrl}/v1/billing/teams/${team.id}/prepaid/balance`, { headers });
-              const balance = centsTotalToBalance(balRes.data?.total);
-              if (balance !== null) {
-                if (!bestResult || balance > bestResult.balance) {
-                  bestResult = { balance, team, note: 'prepaid credit balance' };
+              const result = await fetchPrepaidBalance({ teamId: team.id, get: xaiGet, post: xaiPost });
+              if (result !== null) {
+                if (!bestResult || result.balance > bestResult.balance) {
+                  bestResult = { ...result, team, note: 'prepaid credit balance' };
                 }
                 continue;
               }
@@ -387,17 +405,26 @@ export default function App() {
                       placeholder="예: 42.50"
                     />
                     <button
-                      onClick={() => {
+                      onClick={async () => {
                         const amount = parseFloat(anchorInput);
                         if (isNaN(amount) || amount < 0) {
                           alert('올바른 금액을 입력해주세요.');
                           return;
                         }
-                        const anchor = { amount, ts: Math.floor(Date.now() / 1000) };
-                        localStorage.setItem('openai_balance_anchor', JSON.stringify(anchor));
-                        setOpenaiAnchor(anchor);
-                        setAnchorInput('');
-                        fetchOpenAIData(false, anchor);
+                        if (!keys.openai) {
+                          alert('OpenAI API 키를 먼저 입력해주세요.');
+                          return;
+                        }
+                        try {
+                          const anchor = await createOpenAIAnchor(keys.openai, amount);
+                          localStorage.setItem('openai_balance_anchor', JSON.stringify(anchor));
+                          setOpenaiAnchor(anchor);
+                          setAnchorInput('');
+                          fetchOpenAIData(false, anchor);
+                        } catch (error) {
+                          console.error('Failed to record OpenAI anchor:', error);
+                          alert(`기준 잔액을 저장하지 못했습니다. 오늘 사용량 조회 실패: ${error.message}`);
+                        }
                       }}
                       className="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2.5 rounded-xl font-medium text-xs transition-colors"
                     >
@@ -408,6 +435,9 @@ export default function App() {
                         <span className="text-xs text-gray-500">
                           현재 기준: <span className="text-blue-400 font-mono">${Number(openaiAnchor.amount).toFixed(2)}</span>
                           {' '}({new Date(openaiAnchor.ts * 1000).toLocaleDateString('ko-KR')})
+                          {openaiAnchor.dayStartTs == null && (
+                            <span className="text-amber-400/80"> · 이전 방식으로 저장된 기준입니다. 정확한 잔액을 위해 다시 설정하세요.</span>
+                          )}
                         </span>
                         <button
                           onClick={() => {
