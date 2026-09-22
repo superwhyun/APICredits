@@ -39,10 +39,36 @@ const stringifyError = (value) => {
   return String(value);
 };
 
-const toDisplayError = (rawData, fallbackMessage) => {
-  const errorText = stringifyError(rawData?.error) || stringifyError(rawData) || 'Failed to fetch';
-  const messageText = stringifyError(rawData?.message) || fallbackMessage || 'Check your permissions.';
-  return { error: errorText, message: messageText };
+// Turns a provider failure into two display strings. Two cases must stay
+// distinguishable, because they need completely different fixes:
+//  - The server answered with an error. Show its body, or the bare status when
+//    the body is empty (an empty body used to collapse into "Failed to fetch",
+//    hiding whether it was a 401, 403 or 500).
+//  - The request never reached the server: axios rejects with no `response`
+//    (missing extension host permission, offline, DNS failure, CORS preflight
+//    rejection). Report the transport code, not a server-style message.
+const toDisplayError = (error) => {
+  const status = error?.response?.status;
+
+  if (status) {
+    const rawData = error.response?.data;
+    const bodyText = stringifyError(rawData?.error)
+      || stringifyError(rawData?.message)
+      || stringifyError(rawData);
+    return {
+      error: bodyText || `HTTP ${status} (응답 본문 없음)`,
+      message: bodyText ? `HTTP ${status}` : (error.message || 'Check your permissions.'),
+    };
+  }
+
+  const code = error?.code || 'NO_RESPONSE';
+  const hint = isExtension
+    ? '익스텐션 팝업에서 우클릭 → 검사 → Network 탭에서 차단 사유를 확인하세요.'
+    : '네트워크 연결 또는 CORS 차단을 확인하세요.';
+  return {
+    error: `요청이 서버에 도달하지 못했습니다 (${code})`,
+    message: `${error?.message || 'No response'} · ${hint}`,
+  };
 };
 
 const fetchTavilyUsage = async (apiKey) => {
@@ -67,10 +93,28 @@ const fetchTavilyUsage = async (apiKey) => {
   return { data };
 };
 
+const DEFAULT_KEYS = { openai: '', xai: '', moonshot: '', runpod: '', tavily: '', openrouter: '', vercel: '' };
+
+// HTTP header values may only contain ISO-8859-1. Copying a key from a web page
+// can carry invisible characters (zero-width space, BOM, full-width forms), and
+// XMLHttpRequest.setRequestHeader then throws before the request is ever sent —
+// surfacing as a response-less failure with no server-side clue. API keys are
+// printable ASCII by construction, so anything outside that range is paste
+// debris and is safe to drop.
+const sanitizeApiKey = (value) => String(value ?? '').replace(/[^\x20-\x7E]/g, '').trim();
+
+const sanitizeKeyMap = (map) => Object.fromEntries(
+  Object.entries(map).map(([provider, key]) => [provider, sanitizeApiKey(key)])
+);
+
 export default function App() {
   const [keys, setKeys] = useState(() => {
     const saved = localStorage.getItem('api_keys');
-    return saved ? JSON.parse(saved) : { openai: '', xai: '', moonshot: '', runpod: '', tavily: '', openrouter: '', vercel: '' };
+    // Merge over the defaults: a stored object written before a provider was
+    // added lacks that field, which would make its settings input uncontrolled.
+    // Sanitize on load too, so a key stored before this fix starts working
+    // without the user having to re-enter it.
+    return sanitizeKeyMap({ ...DEFAULT_KEYS, ...(saved ? JSON.parse(saved) : {}) });
   });
 
   const [openaiCache, setOpenaiCache] = useState(() => {
@@ -322,7 +366,7 @@ export default function App() {
       setData(prev => ({ ...prev, [providerId]: response.data }));
     } catch (error) {
       console.error(`Error fetching ${providerId}:`, error);
-      setData(prev => ({ ...prev, [providerId]: toDisplayError(error.response?.data, error.message) }));
+      setData(prev => ({ ...prev, [providerId]: toDisplayError(error) }));
     } finally {
       setLoading(prev => ({ ...prev, [providerId]: false }));
     }
@@ -384,7 +428,7 @@ export default function App() {
                       <input
                         type="password"
                         value={keys[p.id]}
-                        onChange={(e) => setKeys(prev => ({ ...prev, [p.id]: e.target.value }))}
+                        onChange={(e) => setKeys(prev => ({ ...prev, [p.id]: sanitizeApiKey(e.target.value) }))}
                         className="w-full bg-[#16161a] border border-white/10 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500/50 outline-none transition-all placeholder:text-gray-600"
                         placeholder="sk-..."
                       />
