@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "AI Credit Dashboard",
     "version": "1.0.0",
-    "description": "Monitor your AI credits (OpenAI, x.ai, Moonshot, RunPod) in one place.",
+    "description": "Monitor your AI credits (OpenAI, x.ai, Moonshot, RunPod, Vercel AI Gateway) in one place.",
     "action": {
         "default_popup": "index.html",
         "default_title": "AI Credit Dashboard"
@@ -22,6 +22,7 @@
         "https://api.moonshot.cn/*",
         "https://api.moonshot.ai/*",
         "https://api.runpod.io/*",
-        "https://openrouter.ai/*"
+        "https://openrouter.ai/*",
+        "https://ai-gateway.vercel.sh/*"
     ]
 }
