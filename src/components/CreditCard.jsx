@@ -427,7 +427,7 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                     {totalCredits > 0 && (
                         <div className="space-y-2 px-1">
                             <div className="flex justify-between text-[10px] text-gray-500 uppercase font-bold tracking-wider">
-                                <span>Lifetime Usage</span>
+                                <span>Usage Rate</span>
                                 <span>{usageRate.toFixed(1)}%</span>
                             </div>
                             <div className={`${isExtension ? 'h-1.5' : 'h-2.5'} bg-white/5 rounded-full overflow-hidden p-[1px] border border-white/5`}>
@@ -445,6 +445,7 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                             <Info size={12} className="shrink-0 mt-0.5" />
                             <p className="text-[9px] leading-relaxed italic">
                                 OpenRouter의 크레딧 정보를 표시합니다. Management Key 권한이 있는 API 키가 필요할 수 있습니다.
+                                약관상 구매 후 <strong className="not-italic text-amber-400/80">365일이 지난 미사용 크레딧은 만료될 수 있습니다</strong>.
                             </p>
                         </div>
                     )}
@@ -472,7 +473,7 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                             <span className="text-gray-300 font-mono font-semibold">${totalUsed.toFixed(2)}</span>
                         </div>
                         <div className={`flex justify-between items-center text-[10px] border-t border-white/5 ${isExtension ? 'pt-2' : 'pt-3'}`}>
-                            <span className="text-gray-500 font-medium uppercase">Lifetime Total</span>
+                            <span className="text-gray-500 font-medium uppercase">Total Purchased</span>
                             <span className="text-gray-300 font-mono font-semibold">${totalCredits.toFixed(2)}</span>
                         </div>
                     </div>
@@ -480,7 +481,7 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                     {totalCredits > 0 && (
                         <div className="space-y-2 px-1">
                             <div className="flex justify-between text-[10px] text-gray-500 uppercase font-bold tracking-wider">
-                                <span>Lifetime Usage</span>
+                                <span>Usage Rate</span>
                                 <span>{usageRate.toFixed(1)}%</span>
                             </div>
                             <div className={`${isExtension ? 'h-1.5' : 'h-2.5'} bg-white/5 rounded-full overflow-hidden p-[1px] border border-white/5`}>
@@ -498,6 +499,8 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                             <Info size={12} className="shrink-0 mt-0.5" />
                             <p className="text-[9px] leading-relaxed italic">
                                 Vercel AI Gateway의 크레딧 잔액과 누적 사용량을 표시합니다.
+                                구매한 크레딧은 <strong className="not-italic text-amber-400/80">구매일로부터 1년 뒤 만료</strong>됩니다.
+                                API가 만료일을 제공하지 않으므로, 여기 표시된 잔액에 곧 만료될 금액이 포함돼 있을 수 있습니다.
                             </p>
                         </div>
                     )}
