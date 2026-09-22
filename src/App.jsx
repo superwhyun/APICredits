@@ -11,7 +11,8 @@ const PROVIDERS = [
   { id: 'moonshot', name: 'Moonshot AI', icon: 'moon' },
   { id: 'runpod', name: 'RunPod', icon: 'zap' },
   { id: 'tavily', name: 'Tavily', icon: 'database' },
-  { id: 'openrouter', name: 'OpenRouter', icon: 'zap' }
+  { id: 'openrouter', name: 'OpenRouter', icon: 'zap' },
+  { id: 'vercel', name: 'Vercel AI Gateway', icon: 'triangle' }
 ];
 
 const isExtension = typeof globalThis.chrome !== 'undefined' && globalThis.chrome.runtime?.id;
@@ -69,7 +70,7 @@ const fetchTavilyUsage = async (apiKey) => {
 export default function App() {
   const [keys, setKeys] = useState(() => {
     const saved = localStorage.getItem('api_keys');
-    return saved ? JSON.parse(saved) : { openai: '', xai: '', moonshot: '', runpod: '', tavily: '', openrouter: '' };
+    return saved ? JSON.parse(saved) : { openai: '', xai: '', moonshot: '', runpod: '', tavily: '', openrouter: '', vercel: '' };
   });
 
   const [openaiCache, setOpenaiCache] = useState(() => {
@@ -85,9 +86,9 @@ export default function App() {
   });
   const [anchorInput, setAnchorInput] = useState('');
 
-  const [data, setData] = useState({ openai: null, xai: null, moonshot: null, runpod: null, tavily: null, openrouter: null });
-  const [loading, setLoading] = useState({ openai: false, xai: false, moonshot: false, runpod: false, tavily: false, openrouter: false });
-  const [progressMessages, setProgressMessages] = useState({ openai: '', xai: '', moonshot: '', runpod: '', tavily: '', openrouter: '' });
+  const [data, setData] = useState({ openai: null, xai: null, moonshot: null, runpod: null, tavily: null, openrouter: null, vercel: null });
+  const [loading, setLoading] = useState({ openai: false, xai: false, moonshot: false, runpod: false, tavily: false, openrouter: false, vercel: false });
+  const [progressMessages, setProgressMessages] = useState({ openai: '', xai: '', moonshot: '', runpod: '', tavily: '', openrouter: '', vercel: '' });
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
@@ -311,6 +312,8 @@ export default function App() {
           response = { data: { balance: Number(gqlResponse.data.data?.myself?.clientBalance || 0) } };
         } else if (providerId === 'openrouter') {
           response = await axios.get('https://openrouter.ai/api/v1/credits', { headers });
+        } else if (providerId === 'vercel') {
+          response = await axios.get('https://ai-gateway.vercel.sh/v1/credits', { headers });
         }
       } else {
         response = await axios.post(`/api/${providerId}`, { apiKey });
@@ -498,7 +501,7 @@ export default function App() {
           ))}
         </div>
 
-        {!keys.openai && !keys.xai && !keys.moonshot && !keys.runpod && !keys.tavily && !keys.openrouter && !showSettings && (
+        {!keys.openai && !keys.xai && !keys.moonshot && !keys.runpod && !keys.tavily && !keys.openrouter && !keys.vercel && !showSettings && (
           <Motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}

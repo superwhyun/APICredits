@@ -1,6 +1,6 @@
 # AI Credit Dashboard 🚀
 
-현존하는 주요 AI 서비스(OpenAI, x.ai, OpenRouter, Moonshot AI, RunPod, Tavily)의 사용량과 크레딧 잔액을 한곳에서 쉽고 빠르게 모니터링할 수 있는 프리미엄 대시보드입니다.
+현존하는 주요 AI 서비스(OpenAI, x.ai, OpenRouter, Moonshot AI, RunPod, Tavily, Vercel AI Gateway)의 사용량과 크레딧 잔액을 한곳에서 쉽고 빠르게 모니터링할 수 있는 프리미엄 대시보드입니다.
 
 > **다른 PC에 설치하려면?** 앱스토어 배포 없이 GitHub에서 클론해 직접 로드하는 방식입니다. [다른 장비에 설치하기](#다른-장비에-설치하기-chrome-extension) 절차를 따르면 5분 안에 끝납니다.
 
@@ -32,7 +32,11 @@
 - **실시간 크레딧 확인**: Tavily Usage API를 통해 남은 크레딧과 사용량을 즉시 확인합니다.
 - **플랜/리셋일 표시**: 현재 플랜과 크레딧 리셋 일자를 함께 보여줍니다.
 
-### 7. 보안 및 성능 (Privacy & Performance)
+### 7. Vercel AI Gateway 크레딧 조회
+- **실시간 크레딧 확인**: Vercel AI Gateway Credits API를 통해 남은 잔액(`balance`)과 누적 사용량(`total_used`)을 즉시 확인합니다.
+- **사용률 표시**: 전체 크레딧 대비 누적 사용량을 시각화하여 보여줍니다.
+
+### 8. 보안 및 성능 (Privacy & Performance)
 - **로컬 저장**: 모든 API Key와 월별 캐시 데이터는 사용자의 브라우저(`localStorage`)에만 저장됩니다. 서버에는 절대 전송되지 않습니다.
 - **Vercel Proxy**: API Key 노출을 방지하기 위해 Vercel Serverless Functions를 프록시로 사용하여 안전하게 데이터를 요청합니다.
 
@@ -63,6 +67,10 @@
 ### 6. Tavily
 - **키 발급처**: [Tavily Dashboard](https://app.tavily.com/home)
 - **필요 권한**: Usage 조회가 가능한 일반 Tavily API Key를 사용하면 됩니다.
+
+### 7. Vercel AI Gateway
+- **키 발급처**: [Vercel AI Gateway](https://vercel.com/docs/ai-gateway/authentication-and-byok#api-key) (AI Gateway API Key)
+- **참고**: 팀 단위로 발급되는 AI Gateway API Key를 사용하면 됩니다.
 
 ---
 

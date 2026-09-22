@@ -1,12 +1,13 @@
 import React from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
-import { RefreshCw, AlertCircle, TrendingUp, Wallet, Zap, Cpu, Moon, Info, Database } from 'lucide-react';
+import { RefreshCw, AlertCircle, TrendingUp, Wallet, Zap, Cpu, Moon, Info, Database, Triangle } from 'lucide-react';
 
 const ICON_MAP = {
     zap: Zap,
     cpu: Cpu,
     moon: Moon,
-    database: Database
+    database: Database,
+    triangle: Triangle
 };
 
 export default function CreditCard({ provider, data, loading, progressMessage, onRefresh, isExtension }) {
@@ -451,6 +452,59 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
             );
         }
 
+        if (provider.id === 'vercel') {
+            // Vercel AI Gateway returns { balance: "95.50", total_used: "4.50" } (strings, USD)
+            const balance = Number(data.balance || 0);
+            const totalUsed = Number(data.total_used || 0);
+            const totalCredits = balance + totalUsed;
+            const usageRate = totalCredits > 0 ? (totalUsed / totalCredits) * 100 : 0;
+
+            return (
+                <div className={isExtension ? 'space-y-3' : 'space-y-6'}>
+                    <div>
+                        {!isExtension && <p className="text-xs text-gray-400 uppercase tracking-widest mb-1 font-bold">Available Balance</p>}
+                        <h3 className={isExtension ? 'text-2xl font-bold' : 'text-4xl font-bold'}>${balance.toFixed(2)}</h3>
+                    </div>
+
+                    <div className={`${isExtension ? 'p-3' : 'p-4'} rounded-2xl bg-white/5 border border-white/5 space-y-2`}>
+                        <div className="flex justify-between items-center text-[10px]">
+                            <span className="text-gray-500 font-medium uppercase">Total Used</span>
+                            <span className="text-gray-300 font-mono font-semibold">${totalUsed.toFixed(2)}</span>
+                        </div>
+                        <div className={`flex justify-between items-center text-[10px] border-t border-white/5 ${isExtension ? 'pt-2' : 'pt-3'}`}>
+                            <span className="text-gray-500 font-medium uppercase">Lifetime Total</span>
+                            <span className="text-gray-300 font-mono font-semibold">${totalCredits.toFixed(2)}</span>
+                        </div>
+                    </div>
+
+                    {totalCredits > 0 && (
+                        <div className="space-y-2 px-1">
+                            <div className="flex justify-between text-[10px] text-gray-500 uppercase font-bold tracking-wider">
+                                <span>Lifetime Usage</span>
+                                <span>{usageRate.toFixed(1)}%</span>
+                            </div>
+                            <div className={`${isExtension ? 'h-1.5' : 'h-2.5'} bg-white/5 rounded-full overflow-hidden p-[1px] border border-white/5`}>
+                                <Motion.div
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${Math.min(usageRate, 100)}%` }}
+                                    className="h-full rounded-full bg-gradient-to-r from-gray-300 to-gray-500"
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {!isExtension && (
+                        <div className="flex items-start gap-2 px-1 opacity-50">
+                            <Info size={12} className="shrink-0 mt-0.5" />
+                            <p className="text-[9px] leading-relaxed italic">
+                                Vercel AI Gateway의 크레딧 잔액과 누적 사용량을 표시합니다.
+                            </p>
+                        </div>
+                    )}
+                </div>
+            );
+        }
+
         return null;
     };
 
@@ -468,13 +522,15 @@ export default function CreditCard({ provider, data, loading, progressMessage, o
                             provider.id === 'xai' ? 'from-blue-500/20 to-indigo-600/20 group-hover:from-blue-500/30' :
                                 provider.id === 'tavily' ? 'from-cyan-500/20 to-sky-600/20 group-hover:from-cyan-500/30' :
                                     provider.id === 'openrouter' ? 'from-indigo-500/20 to-purple-600/20 group-hover:from-indigo-500/30' :
-                                        'from-purple-500/20 to-pink-600/20 group-hover:from-purple-500/30'}`}>
+                                        provider.id === 'vercel' ? 'from-gray-300/20 to-gray-500/20 group-hover:from-gray-300/30' :
+                                            'from-purple-500/20 to-pink-600/20 group-hover:from-purple-500/30'}`}>
                         <Icon size={isExtension ? 16 : 24} className={
                             provider.id === 'openai' ? 'text-green-400' :
                                 provider.id === 'xai' ? 'text-blue-400' :
                                     provider.id === 'tavily' ? 'text-cyan-400' :
                                         provider.id === 'openrouter' ? 'text-indigo-400' :
-                                            'text-purple-400'
+                                            provider.id === 'vercel' ? 'text-gray-200' :
+                                                'text-purple-400'
                         } />
                     </div>
                     <h2 className={`${isExtension ? 'text-sm' : 'text-lg'} font-bold mr-auto ml-3 tracking-tight`}>{provider.name}</h2>
